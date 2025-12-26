@@ -237,22 +237,7 @@ import { BadgeDesign, Decoration, DecorationType } from '../services/badge-types
                     class="w-20 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                   >
                 </div>
-               <div class="flex items-center gap-2 mb-2">
-                 <select 
-                   [ngModel]="store.badge().iconStyle"
-                   (ngModelChange)="store.update({iconStyle: $event})"
-                   class="text-xs rounded-md border-gray-300 shadow-sm focus:border-blue-500 px-2 py-1 bg-white text-gray-900"
-                 >
-                   <option value="emoji">Emoji (Color)</option>
-                   <option value="mono">Monochrome</option>
-                 </select>
-                 @if (store.badge().iconStyle === 'mono') {
-                   <div class="flex items-center gap-1">
-                     <input type="color" [ngModel]="store.badge().iconColor" (ngModelChange)="store.update({iconColor: $event})" class="h-8 w-8 rounded cursor-pointer border border-gray-200 p-0 bg-white">
-                     <span class="text-[10px] text-gray-500">Icon Color</span>
-                   </div>
-                 }
-               </div>
+
                
                <div class="flex gap-2">
                  <input type="text" 

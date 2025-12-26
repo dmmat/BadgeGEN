@@ -52,6 +52,8 @@ export class BadgeStore {
   readonly state = signal<BadgeDesign>(createDefaultBadge());
   private undoStack: BadgeDesign[] = [];
   private redoStack: BadgeDesign[] = [];
+  private debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+  private debounceBaselines: Record<string, BadgeDesign | undefined> = {};
 
   // Actions
   update(partial: Partial<BadgeDesign>) {
@@ -77,7 +79,13 @@ export class BadgeStore {
       [key]: { ...(currentSettings || defaultSettings), ...settings }
     } as BadgeDesign;
 
-    this.commit(merged);
+    const isPositionalChange = 'x' in settings || 'y' in settings || 'size' in settings;
+    if (isPositionalChange) {
+      // Live update the state, but debounce the history commit to avoid per-pixel entries
+      this.commitDebounced(`element:${element}`, merged, 200);
+    } else {
+      this.commit(merged);
+    }
   }
 
   // Decoration Actions
@@ -92,10 +100,17 @@ export class BadgeStore {
 
   updateDecoration(id: string, updates: Partial<Decoration>) {
     const current = this.state();
-    this.commit({
+    const merged = {
       ...current,
       decorations: current.decorations.map(d => d.id === id ? { ...d, ...updates } : d)
-    });
+    } as BadgeDesign;
+
+    const isPositionalChange = 'x' in updates || 'y' in updates || 'size' in updates;
+    if (isPositionalChange) {
+      this.commitDebounced(`decoration:${id}`, merged, 200);
+    } else {
+      this.commit(merged);
+    }
   }
 
   removeDecoration(id: string) {
@@ -118,10 +133,17 @@ export class BadgeStore {
 
   updateExtraText(id: string, updates: Partial<ExtraText>) {
     const current = this.state();
-    this.commit({
+    const merged = {
       ...current,
       extraTexts: current.extraTexts.map(t => t.id === id ? { ...t, ...updates } : t)
-    });
+    } as BadgeDesign;
+
+    const isPositionalChange = 'x' in updates || 'y' in updates || 'size' in updates;
+    if (isPositionalChange) {
+      this.commitDebounced(`extraText:${id}`, merged, 200);
+    } else {
+      this.commit(merged);
+    }
   }
 
   removeExtraText(id: string) {
@@ -191,5 +213,35 @@ export class BadgeStore {
     }
     this.redoStack = [];
     this.state.set(cloneDesign(newState));
+  }
+
+  private commitDebounced(key: string, newState: BadgeDesign, ms = 200) {
+    // Initialize baseline on first call for this key
+    if (!this.debounceTimers[key] && !this.debounceBaselines[key]) {
+      this.debounceBaselines[key] = cloneDesign(this.state());
+    }
+
+    // Reset timer for coalescing rapid updates
+    if (this.debounceTimers[key]) {
+      clearTimeout(this.debounceTimers[key]);
+    }
+
+    // Live-update the state for immediate visual feedback
+    this.state.set(cloneDesign(newState));
+
+    // Schedule a single history commit using the baseline
+    this.debounceTimers[key] = setTimeout(() => {
+      const baseline = this.debounceBaselines[key] ?? cloneDesign(this.state());
+      delete this.debounceTimers[key];
+      delete this.debounceBaselines[key];
+
+      // Push baseline to undo history and apply final state
+      this.undoStack.push(baseline);
+      if (this.undoStack.length > MAX_UNDO_HISTORY) {
+        this.undoStack.shift();
+      }
+      this.redoStack = [];
+      this.state.set(cloneDesign(newState));
+    }, ms);
   }
 }
