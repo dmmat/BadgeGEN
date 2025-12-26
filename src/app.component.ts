@@ -1,11 +1,12 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { BadgePreviewComponent } from './components/badge-preview.component';
-import { BadgeControlsComponent } from './components/badge-controls.component';
+import { BadgeMainControlsComponent } from './components/badge-main-controls.component';
+import { BadgeExtrasComponent } from './components/badge-extras.component';
 import { BadgeStore } from './services/badge.store';
 
 @Component({
   selector: 'app-root',
-  imports: [BadgePreviewComponent, BadgeControlsComponent],
+  imports: [BadgePreviewComponent, BadgeMainControlsComponent, BadgeExtrasComponent],
   templateUrl: './app.component.html'
 })
 export class AppComponent implements OnInit {

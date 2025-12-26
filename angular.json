@@ -19,6 +19,18 @@
             "browser": "index.tsx",
             "tsConfig": "tsconfig.json",
             "inlineStyleLanguage": "css",
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "src/assets",
+                "output": "assets"
+              },
+              {
+                "glob": "site.webmanifest",
+                "input": ".",
+                "output": "."
+              }
+            ],
             "optimization": {
               "fonts": false
             }

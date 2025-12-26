@@ -3,7 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="BadgeGen KS helps designers and community builders craft premium certification badges, awards, and shareable credentials in seconds.">
+  <meta name="keywords" content="badge generator, certification design, award maker, community swag, shareable credential">
+  <meta name="author" content="BadgeGen Studio">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="color-scheme" content="light">
+  <link rel="canonical" href="https://badgegen.ks/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="BadgeGen KS">
+  <meta property="og:title" content="BadgeGen KS · Modern Badge Designer">
+  <meta property="og:description" content="Design striking badges, event awards, and trust signals with live preview, undo/redo, and instant PNG export.">
+  <meta property="og:url" content="https://badgegen.ks/">
+  <meta property="og:image" content="https://dummyimage.com/1200x630/0f172a/ffffff.png&text=BadgeGen+KS">
+  <meta property="og:image:alt" content="Preview of a BadgeGen KS certificate badge">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="BadgeGen KS · Badge Generator">
+  <meta name="twitter:description" content="Craft bespoke digital badges with gradients, typography, and decorations without leaving the browser.">
+  <meta name="twitter:image" content="https://dummyimage.com/1200x630/0f172a/ffffff.png&text=BadgeGen+KS">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="BadgeGen KS">
   <title>BadgeGen KS</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/favicon.svg">
+  <link rel="manifest" href="/site.webmanifest">
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Load fonts globally -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -17,6 +40,10 @@
       background-image: linear-gradient(to right, #e5e7eb 1px, transparent 1px),
                         linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);
       background-size: 24px 24px;
+    }
+    /* Ensure consistent light gray borders on all text inputs */
+    input:not([type="range"]), select, textarea {
+      border: 1px solid #d1d5db;
     }
     /* Custom slider thumb styling for better usability */
     input[type="range"]::-webkit-slider-thumb {

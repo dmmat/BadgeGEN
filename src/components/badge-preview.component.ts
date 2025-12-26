@@ -17,11 +17,18 @@ interface DragState {
   selector: 'app-badge-preview',
   template: `
     <div 
-      class="relative w-full max-w-[900px] mx-auto flex flex-col items-center p-10 bg-white rounded-xl shadow-sm border border-gray-100"
+      class="relative w-full max-w-[880px] mx-auto flex flex-col items-center p-6 bg-white rounded-xl shadow-sm border border-gray-100"
       (mousemove)="onMouseMove($event)"
       (mouseup)="onMouseUp()"
       (mouseleave)="onMouseUp()"
     >
+      <div class="w-full flex items-center justify-between mb-4 text-xs">
+        <span class="uppercase tracking-wide text-gray-400">Live Preview</span>
+        <div class="flex gap-2">
+          <button (click)="store.undo()" [disabled]="!store.canUndo()" class="px-3 py-1 rounded-md border border-gray-200 bg-white text-gray-700 font-semibold disabled:opacity-40">↶ Undo</button>
+          <button (click)="store.redo()" [disabled]="!store.canRedo()" class="px-3 py-1 rounded-md border border-gray-200 bg-white text-gray-700 font-semibold disabled:opacity-40">↷ Redo</button>
+        </div>
+      </div>
       <div #captureContainer class="w-full aspect-square max-w-[700px] flex items-center justify-center relative select-none">
         
         <!-- SVG Canvas -->
@@ -136,36 +143,13 @@ interface DragState {
                } @else {
                   <!-- Inline paths -->
                   @if (deco.type === 'star') {
-                    <polygon points="0,-10 2.2,-3.2 9.5,-3.2 3.6,1.1 5.9,7.8 0,3.6 -5.9,7.8 -3.6,1.1 -9.5,-3.2 -2.2,-3.2" [attr.fill]="deco.color || 'white'"/>
-                  }
-                  @if (deco.type === 'heart') {
-                    <path d="M0,8 C-5,8 -10,3 -10,-3 C-10,-9 -5,-12 0,-5 C5,-12 10,-9 10,-3 C10,3 5,8 0,8 Z" [attr.fill]="deco.color || 'white'"/>
+                    <polygon points="0,-10 2.2,-3.2 9.5,-3.2 3.6,1.1 5.9,7.8 0,3.6 -5.9,7.8 -3.6,1.1 -9.5,-3.2 -2.2,-3.2" [attr.fill]="deco.color || design().textColor"/>
                   }
                   @if (deco.type === 'crown') {
-                    <path d="M-10,5 L-10,-5 L-6,-2 L0,-8 L6,-2 L10,-5 L10,5 Z" [attr.fill]="deco.color || 'white'"/>
-                  }
-                  @if (deco.type === 'laurel-wreath') {
-                    <path d="M-20,10 Q-25,0 -20,-10 Q-15,-15 -10,-10" fill="none" [attr.stroke]="deco.color || 'white'" stroke-width="2"/>
-                    <path d="M20,10 Q25,0 20,-10 Q15,-15 10,-10" fill="none" [attr.stroke]="deco.color || 'white'" stroke-width="2"/>
-                  }
-                  @if (deco.type === 'ribbon-bow') {
-                    <path d="M0,0 C-5,-5 -10,5 -10,-5 C-10,-10 -5,-10 0,-2 C5,-10 10,-10 10,-5 C10,5 5,-5 0,0 L-3,10 L0,8 L3,10 Z" [attr.fill]="deco.color || 'white'"/>
-                  }
-                  @if (deco.type === 'wing') {
-                    <path d="M0,0 Q10,-10 20,-5 Q25,0 15,5 Q10,2 0,0" [attr.fill]="deco.color || 'white'"/>
-                  }
-                  @if (deco.type === 'sparkles') {
-                    <path d="M0 -10 L2 -2 L10 0 L2 2 L0 10 L-2 2 L-10 0 L-2 -2 Z" [attr.fill]="deco.color || 'white'"/>
-                  }
-                  @if (deco.type === 'trophy') {
-                    <path d="M-8 -8 H8 L6 4 H-6 Z M-4 4 V8 H4 V4 M-5 10 H5" [attr.fill]="deco.color || 'white'"/>
-                  }
-                  @if (deco.type === 'medal') {
-                    <circle r="6" cy="2" [attr.fill]="deco.color || 'white'"/>
-                    <path d="M-4 -8 L-4 -2 L4 -2 L4 -8" fill="none" [attr.stroke]="deco.color || 'white'" stroke-width="2"/>
+                    <path d="M-10,5 L-10,-5 L-6,-2 L0,-8 L6,-2 L10,-5 L10,5 Z" [attr.fill]="deco.color || design().textColor"/>
                   }
                   @if (deco.type === 'check-mark') {
-                     <path d="M-8 0 L-2 6 L8 -6" fill="none" [attr.stroke]="deco.color || 'white'" stroke-width="3" stroke-linecap="round"/>
+                     <path d="M-8 0 L-2 6 L8 -6" fill="none" [attr.stroke]="deco.color || design().textColor" stroke-width="3" stroke-linecap="round"/>
                   }
                }
             </g>

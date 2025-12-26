@@ -1,5 +1,17 @@
 {
-  "name": "BadgeGen",
-  "description": "A powerful certification badge generator. Design custom badges, certificates, and awards, then export them as high-quality images.",
+  "name": "BadgeGen KS",
+  "shortName": "BadgeGen",
+  "description": "A premium badge and credential designer for creating shareable awards, event swag, and community recognition graphics in seconds.",
+  "homepage": "https://badgegen.ks/",
+  "themeColor": "#0f172a",
+  "backgroundColor": "#f8fafc",
+  "keywords": [
+    "badge generator",
+    "certificate designer",
+    "event branding",
+    "community swag",
+    "shareable credentials"
+  ],
+  "repository": "https://github.com/dmmat/BadgeGEN",
   "requestFramePermissions": []
 }
