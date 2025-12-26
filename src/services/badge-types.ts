@@ -1,5 +1,3 @@
-import { Injectable } from '@angular/core';
-
 export interface LayoutSettings {
   x: number;
   y: number;
@@ -69,11 +67,4 @@ export interface BadgeDesign {
   // Extra Elements
   decorations: Decoration[];
   extraTexts: ExtraText[];
-}
-
-@Injectable({
-  providedIn: 'root'
-})
-export class GeminiService {
-  constructor() {}
 }
