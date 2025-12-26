@@ -1,7 +1,6 @@
 import { Component, input, ElementRef, viewChild, inject, signal, effect } from '@angular/core';
 import { BadgeDesign, LayoutSettings } from '../services/badge-types';
 import { BadgeStore } from '../services/badge.store';
-import { NgClass } from '@angular/common';
 
 type DraggableType = 'title' | 'subtitle' | 'accent' | 'icon' | 'decoration' | 'extraText';
 
@@ -280,7 +279,6 @@ interface DragState {
       </div>
     </div>
   `,
-  imports: [NgClass],
   standalone: true
 })
 export class BadgePreviewComponent {

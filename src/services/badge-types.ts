@@ -1,5 +1,3 @@
-import { Injectable } from '@angular/core';
-
 export interface LayoutSettings {
   x: number;
   y: number;
