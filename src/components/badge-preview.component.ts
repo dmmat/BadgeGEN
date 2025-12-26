@@ -17,12 +17,12 @@ interface DragState {
   selector: 'app-badge-preview',
   template: `
     <div 
-      class="relative w-full aspect-square max-w-[500px] mx-auto flex items-center justify-center p-8 bg-white rounded-xl shadow-sm border border-gray-100"
+      class="relative w-full max-w-[900px] mx-auto flex flex-col items-center p-10 bg-white rounded-xl shadow-sm border border-gray-100"
       (mousemove)="onMouseMove($event)"
       (mouseup)="onMouseUp()"
       (mouseleave)="onMouseUp()"
     >
-      <div #captureContainer class="w-full h-full flex items-center justify-center relative select-none">
+      <div #captureContainer class="w-full aspect-square max-w-[700px] flex items-center justify-center relative select-none">
         
         <!-- SVG Canvas -->
         <svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-xl cursor-default" xmlns="http://www.w3.org/2000/svg">
@@ -50,7 +50,10 @@ interface DragState {
             </style>
           </defs>
           
-          <g [attr.filter]="design().hasShadow ? 'url(#shadow)' : 'none'">
+          <g 
+            [attr.filter]="design().hasShadow ? 'url(#shadow)' : 'none'"
+            [attr.transform]="shapeTransform"
+          >
             <!-- Shapes -->
             @switch (design().shape) {
               @case ('circle') {
@@ -190,6 +193,7 @@ interface DragState {
                 [attr.font-size]="design().iconSettings?.size || 40" 
                 filter="url(#shadow)"
                 style="pointer-events: none;"
+                [attr.fill]="design().iconStyle === 'mono' ? design().iconColor : undefined"
               >
                 {{ design().emoji }}
               </text>
@@ -279,21 +283,44 @@ interface DragState {
         </svg>
       </div>
 
-      <!-- Export Actions Overlay -->
-      <div class="absolute bottom-4 right-4 flex gap-2">
-        <button (click)="downloadPng()" class="bg-gray-900 hover:bg-black text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-lg flex items-center gap-1">
-           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-           PNG
-        </button>
+      <!-- Controls (below canvas) -->
+      <div class="mt-4 w-full flex items-center justify-center">
+        <div class="flex items-center gap-3 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
+          <label class="text-xs text-gray-600">Canvas</label>
+          <input type="range" min="1000" max="1500" step="100"
+            [value]="store.badge().canvasSize || 1000"
+            (input)="store.update({canvasSize: +$any($event.target).value})"
+            class="w-48 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+            aria-label="Canvas size"
+          />
+          <span class="text-xs text-gray-600">{{store.badge().canvasSize || 1000}}px</span>
+
+          <button (click)="downloadPng()" class="ml-3 bg-gray-900 hover:bg-black text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-lg flex items-center gap-1">
+             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+             PNG
+          </button>
+        </div>
       </div>
     </div>
   `,
   standalone: true
 })
 export class BadgePreviewComponent {
+  private static readonly CENTER = 100;
+  private static readonly loadedFonts = new Set<string>();
+  readonly CENTER = BadgePreviewComponent.CENTER;
+  
+  get shapeTransform() {
+    const scale = (this.design().shapeScale || 100) / 100;
+    const c = this.CENTER;
+    return `translate(${c} ${c}) scale(${scale}) translate(-${c} -${c})`;
+  }
   store = inject(BadgeStore);
   design = this.store.badge;
   captureContainer = viewChild<ElementRef>('captureContainer');
+  private readonly fontLoaderEffect = effect(() => {
+    this.ensureFontLoaded(this.design().font);
+  });
 
   // Dragging State
   private dragState: DragState | null = null;
@@ -414,14 +441,15 @@ export class BadgePreviewComponent {
     const ctx = canvas.getContext('2d');
     const img = new Image();
 
-    canvas.width = 1000;
-    canvas.height = 1000;
+    const size = this.design().canvasSize || 1000;
+    canvas.width = size;
+    canvas.height = size;
 
     const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(svgBlob);
 
     img.onload = () => {
-      ctx?.drawImage(img, 0, 0, 1000, 1000);
+      ctx?.drawImage(img, 0, 0, size, size);
       const pngUrl = canvas.toDataURL('image/png');
       
       const downloadLink = document.createElement('a');
@@ -434,5 +462,28 @@ export class BadgePreviewComponent {
     };
 
     img.src = url;
+  }
+
+  private ensureFontLoaded(font?: string) {
+    if (!font || typeof document === 'undefined' || BadgePreviewComponent.loadedFonts.has(font)) {
+      return;
+    }
+
+    const head = document.head;
+    if (!head) return;
+
+    const fontParam = font.replace(/ /g, '+');
+    const href = `https://fonts.googleapis.com/css2?family=${fontParam}:ital,wght@0,400;0,700;1,400;1,700&display=swap`;
+    const linkId = `badge-font-${fontParam}`;
+
+    if (!document.getElementById(linkId)) {
+      const link = document.createElement('link');
+      link.id = linkId;
+      link.rel = 'stylesheet';
+      link.href = href;
+      head.appendChild(link);
+    }
+
+    BadgePreviewComponent.loadedFonts.add(font);
   }
 }
