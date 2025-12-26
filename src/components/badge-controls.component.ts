@@ -12,8 +12,15 @@ import { BadgeDesign, Decoration, DecorationType } from '../services/badge-types
       <div class="space-y-4">
         <!-- Tabs for Config / Decorations -->
         <div class="flex border-b border-gray-200">
-           <button (click)="activeTab = 'config'" [class]="activeTab === 'config' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'" class="flex-1 py-2 text-xs font-bold uppercase tracking-wider border-b-2">Configuration</button>
-           <button (click)="activeTab = 'decorations'" [class]="activeTab === 'decorations' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'" class="flex-1 py-2 text-xs font-bold uppercase tracking-wider border-b-2">Decorations</button>
+          <button (click)="activeTab = 'config'" [class]="activeTab === 'config' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'" class="flex-1 py-2 text-xs font-bold uppercase tracking-wider border-b-2">Configuration</button>
+          <button (click)="activeTab = 'decorations'" [class]="activeTab === 'decorations' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'" class="flex-1 py-2 text-xs font-bold uppercase tracking-wider border-b-2">Decorations</button>
+        </div>
+        <div class="flex items-center justify-between pt-2">
+          <div class="flex gap-2">
+            <button (click)="store.undo()" [disabled]="!store.canUndo()" class="px-3 py-1 rounded-md text-xs font-semibold border border-gray-200 bg-white disabled:opacity-50">Undo</button>
+            <button (click)="store.redo()" [disabled]="!store.canRedo()" class="px-3 py-1 rounded-md text-xs font-semibold border border-gray-200 bg-white disabled:opacity-50">Redo</button>
+          </div>
+          <button (click)="store.reset()" class="px-3 py-1 rounded-md text-xs font-semibold border border-red-200 text-red-600 bg-red-50 hover:bg-red-100">Reset All</button>
         </div>
         
         @if (activeTab === 'config') {
@@ -49,6 +56,17 @@ import { BadgeDesign, Decoration, DecorationType } from '../services/badge-types
                   @if(shape === 'shield-modern') { <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M5 4h14l-2 10-5 6-5-6-2-10z"/></svg> }
                 </button>
               }
+            </div>
+            <div class="mt-3 space-y-1">
+              <label class="text-xs text-gray-500">Size: {{store.badge().shapeScale || 100}}%</label>
+              <input type="range" min="70" max="130" 
+                [ngModel]="store.badge().shapeScale || 100" 
+                (ngModelChange)="store.update({shapeScale: +$event})"
+                class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                aria-label="Shape size"
+                aria-valuemin="70"
+                aria-valuemax="130"
+                [attr.aria-valuenow]="store.badge().shapeScale || 100">
             </div>
           </div>
 
@@ -133,12 +151,15 @@ import { BadgeDesign, Decoration, DecorationType } from '../services/badge-types
              >
                 <option value="Inter">Inter (Modern)</option>
                 <option value="Roboto Slab">Roboto Slab (Serif)</option>
-                <option value="Playfair Display">Playfair Display (Elegant)</option>
-                <option value="Oswald">Oswald (Bold Condensed)</option>
-                <option value="Cinzel">Cinzel (Classic)</option>
-                <option value="Montserrat">Montserrat (Geometric)</option>
-             </select>
-           </div>
+                 <option value="Playfair Display">Playfair Display (Elegant)</option>
+                 <option value="Oswald">Oswald (Bold Condensed)</option>
+                 <option value="Cinzel">Cinzel (Classic)</option>
+                 <option value="Montserrat">Montserrat (Geometric)</option>
+                 <option value="Poppins">Poppins (Rounded)</option>
+                 <option value="Manrope">Manrope (Friendly Sans)</option>
+                 <option value="Lora">Lora (Modern Serif)</option>
+              </select>
+            </div>
 
           <!-- Text Inputs & Sizers -->
           <div class="space-y-4">
@@ -208,18 +229,34 @@ import { BadgeDesign, Decoration, DecorationType } from '../services/badge-types
 
             <!-- Logo/Icon Control -->
             <div class="bg-gray-50 p-3 rounded-lg border border-gray-100">
-              <div class="flex justify-between items-center mb-2">
-                 <label class="text-xs font-medium text-gray-500">Logo</label>
-                 <input type="range" min="20" max="100" 
-                   [ngModel]="store.badge().iconSettings?.size || 40" 
-                   (ngModelChange)="updateSize('icon', $event)"
-                   class="w-20 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+               <div class="flex justify-between items-center mb-2">
+                  <label class="text-xs font-medium text-gray-500">Logo</label>
+                  <input type="range" min="20" max="100" 
+                    [ngModel]="store.badge().iconSettings?.size || 40" 
+                    (ngModelChange)="updateSize('icon', $event)"
+                    class="w-20 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  >
+                </div>
+               <div class="flex items-center gap-2 mb-2">
+                 <select 
+                   [ngModel]="store.badge().iconStyle"
+                   (ngModelChange)="store.update({iconStyle: $event})"
+                   class="text-xs rounded-md border-gray-300 shadow-sm focus:border-blue-500 px-2 py-1 bg-white text-gray-900"
                  >
-              </div>
-              
-              <div class="flex gap-2">
-                <input type="text" 
-                  [ngModel]="store.badge().emoji" 
+                   <option value="emoji">Emoji (Color)</option>
+                   <option value="mono">Monochrome</option>
+                 </select>
+                 @if (store.badge().iconStyle === 'mono') {
+                   <div class="flex items-center gap-1">
+                     <input type="color" [ngModel]="store.badge().iconColor" (ngModelChange)="store.update({iconColor: $event})" class="h-8 w-8 rounded cursor-pointer border border-gray-200 p-0 bg-white">
+                     <span class="text-[10px] text-gray-500">Icon Color</span>
+                   </div>
+                 }
+               </div>
+               
+               <div class="flex gap-2">
+                 <input type="text" 
+                   [ngModel]="store.badge().emoji" 
                   (ngModelChange)="store.update({emoji: $event, customLogo: undefined})"
                   placeholder="Emoji"
                   class="flex-1 text-sm rounded-md border-gray-300 shadow-sm focus:border-blue-500 px-2 py-1 bg-white text-gray-900"
@@ -303,11 +340,11 @@ import { BadgeDesign, Decoration, DecorationType } from '../services/badge-types
                     @for (deco of store.badge().decorations; track deco.id) {
                       <div class="flex items-center justify-between p-2 bg-white rounded border border-gray-200 text-xs">
                          <span class="capitalize">{{ deco.type }}</span>
-                         <div class="flex items-center gap-2">
-                            <input type="color" [ngModel]="deco.color || '#ffffff'" (ngModelChange)="store.updateDecoration(deco.id, {color: $event})" class="w-4 h-4 p-0 border-0 rounded cursor-pointer bg-white">
-                            <input type="range" min="10" max="60" [value]="deco.size" (input)="store.updateDecoration(deco.id, {size: +$any($event.target).value})" class="w-16 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
-                            <button (click)="store.removeDecoration(deco.id)" class="text-red-500 hover:text-red-700">×</button>
-                         </div>
+                             <div class="flex items-center gap-2">
+                             <input type="color" [ngModel]="deco.color || '#ffffff'" (ngModelChange)="store.updateDecoration(deco.id, {color: $event})" class="w-4 h-4 p-0 border-0 rounded cursor-pointer bg-white" aria-label="Decoration color">
+                             <input type="range" min="10" max="60" [value]="deco.size" (input)="store.updateDecoration(deco.id, {size: +$any($event.target).value})" class="w-16 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                             <button (click)="store.removeDecoration(deco.id)" class="text-red-500 hover:text-red-700">×</button>
+                          </div>
                       </div>
                     }
                  </div>

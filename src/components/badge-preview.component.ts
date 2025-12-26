@@ -50,7 +50,10 @@ interface DragState {
             </style>
           </defs>
           
-          <g [attr.filter]="design().hasShadow ? 'url(#shadow)' : 'none'">
+          <g 
+            [attr.filter]="design().hasShadow ? 'url(#shadow)' : 'none'"
+            [attr.transform]="shapeTransform"
+          >
             <!-- Shapes -->
             @switch (design().shape) {
               @case ('circle') {
@@ -190,6 +193,7 @@ interface DragState {
                 [attr.font-size]="design().iconSettings?.size || 40" 
                 filter="url(#shadow)"
                 style="pointer-events: none;"
+                [attr.fill]="design().iconStyle === 'mono' ? design().iconColor : undefined"
               >
                 {{ design().emoji }}
               </text>
@@ -291,6 +295,14 @@ interface DragState {
   standalone: true
 })
 export class BadgePreviewComponent {
+  private static readonly CENTER = 100;
+  readonly CENTER = BadgePreviewComponent.CENTER;
+  
+  get shapeTransform() {
+    const scale = (this.design().shapeScale || 100) / 100;
+    const c = this.CENTER;
+    return `translate(${c} ${c}) scale(${scale}) translate(-${c} -${c})`;
+  }
   store = inject(BadgeStore);
   design = this.store.badge;
   captureContainer = viewChild<ElementRef>('captureContainer');
