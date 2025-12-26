@@ -149,15 +149,36 @@ import { BadgeDesign, Decoration, DecorationType } from '../services/badge-types
                (ngModelChange)="store.update({font: $event})"
                class="w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-blue-500 px-2 py-1 bg-white text-gray-900"
              >
-                <option value="Inter">Inter (Modern)</option>
-                <option value="Roboto Slab">Roboto Slab (Serif)</option>
-                 <option value="Playfair Display">Playfair Display (Elegant)</option>
-                 <option value="Oswald">Oswald (Bold Condensed)</option>
-                 <option value="Cinzel">Cinzel (Classic)</option>
-                 <option value="Montserrat">Montserrat (Geometric)</option>
-                 <option value="Poppins">Poppins (Rounded)</option>
-                 <option value="Manrope">Manrope (Friendly Sans)</option>
-                 <option value="Lora">Lora (Modern Serif)</option>
+               <option value="Inter">Inter</option>
+               <option value="Roboto">Roboto</option>
+               <option value="Roboto Slab">Roboto Slab</option>
+               <option value="Open Sans">Open Sans</option>
+               <option value="Lato">Lato</option>
+               <option value="Montserrat">Montserrat</option>
+               <option value="Poppins">Poppins</option>
+               <option value="Nunito">Nunito</option>
+               <option value="Quicksand">Quicksand</option>
+               <option value="Raleway">Raleway</option>
+               <option value="Rubik">Rubik</option>
+               <option value="Kanit">Kanit</option>
+               <option value="Fira Sans">Fira Sans</option>
+               <option value="Source Sans Pro">Source Sans Pro</option>
+               <option value="Playfair Display">Playfair Display</option>
+               <option value="Merriweather">Merriweather</option>
+               <option value="Lora">Lora</option>
+               <option value="Arvo">Arvo</option>
+               <option value="Bebas Neue">Bebas Neue</option>
+               <option value="Cinzel">Cinzel</option>
+               <option value="Abril Fatface">Abril Fatface</option>
+               <option value="Josefin Sans">Josefin Sans</option>
+               <option value="Varela Round">Varela Round</option>
+               <option value="PT Sans">PT Sans</option>
+               <option value="PT Serif">PT Serif</option>
+               <option value="Cabin">Cabin</option>
+               <option value="Noto Sans">Noto Sans</option>
+               <option value="Comfortaa">Comfortaa</option>
+               <option value="Alfa Slab One">Alfa Slab One</option>
+               <option value="Open Sans Condensed">Open Sans Condensed</option>
               </select>
             </div>
 

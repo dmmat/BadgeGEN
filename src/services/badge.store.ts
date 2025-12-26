@@ -13,6 +13,7 @@ const DEFAULT_YEAR = new Date().getFullYear().toString();
 const createDefaultBadge = (): BadgeDesign => ({
   shape: 'shield',
   shapeScale: 100,
+  canvasSize: 1000,
   title: 'Certified',
   subtitle: 'Developer',
   accentText: DEFAULT_YEAR,

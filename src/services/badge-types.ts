@@ -39,6 +39,7 @@ export interface ExtraText {
 export interface BadgeDesign {
   shape: 'circle' | 'shield' | 'hexagon' | 'star' | 'ribbon' | 'diamond' | 'octagon' | 'award' | 'plaque' | 'gem' | 'leaf-1' | 'leaf-2' | 'seal' | 'banner' | 'shield-modern';
   shapeScale: number;
+  canvasSize?: number; // export PNG size (px)
   title: string;
   subtitle: string;
   accentText: string;
