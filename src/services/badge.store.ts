@@ -2,9 +2,9 @@ import { Injectable, signal, computed } from '@angular/core';
 import { BadgeDesign, LayoutSettings, Decoration, ExtraText } from './gemini.service';
 
 const DEFAULT_LAYOUT = {
-  title: { x: 100, y: 120, size: 18 },
-  subtitle: { x: 100, y: 140, size: 12 },
-  accent: { x: 100, y: 165, size: 10 },
+  title: { x: 100, y: 120, size: 18, fontWeight: 'bold', fontStyle: 'normal', hasShadow: true } as LayoutSettings,
+  subtitle: { x: 100, y: 140, size: 12, fontWeight: 'normal', fontStyle: 'normal', hasShadow: false } as LayoutSettings,
+  accent: { x: 100, y: 165, size: 10, fontWeight: 'bold', fontStyle: 'normal', hasShadow: false } as LayoutSettings,
   icon: { x: 100, y: 85, size: 40 }
 };
 
@@ -20,6 +20,9 @@ const DEFAULT_BADGE: BadgeDesign = {
   font: 'Inter',
   gradientType: 'linear',
   gradientAngle: 135,
+  borderWidth: 4,
+  borderColor: '#FFFFFF',
+  hasShadow: true,
   titleSettings: DEFAULT_LAYOUT.title,
   subtitleSettings: DEFAULT_LAYOUT.subtitle,
   accentSettings: DEFAULT_LAYOUT.accent,
@@ -43,10 +46,19 @@ export class BadgeStore {
   updateElement(element: 'title' | 'subtitle' | 'accent' | 'icon', settings: Partial<LayoutSettings>) {
     this.state.update(current => {
       const key = `${element}Settings` as keyof BadgeDesign;
-      const currentSettings = current[key] as LayoutSettings || DEFAULT_LAYOUT[element];
+      const currentSettings = current[key] as LayoutSettings | undefined;
+      
+      // Get default settings for the specific element type
+      let defaultSettings: LayoutSettings | object = {};
+      if (element === 'icon') {
+          defaultSettings = DEFAULT_LAYOUT.icon;
+      } else {
+          defaultSettings = DEFAULT_LAYOUT[element];
+      }
+
       return {
         ...current,
-        [key]: { ...currentSettings, ...settings }
+        [key]: { ...(currentSettings || defaultSettings), ...settings }
       };
     });
   }
@@ -79,7 +91,7 @@ export class BadgeStore {
     const id = crypto.randomUUID();
     this.state.update(current => ({
       ...current,
-      extraTexts: [...current.extraTexts, { ...text, id }]
+      extraTexts: [...current.extraTexts, { ...text, id, fontWeight: 'bold', fontStyle: 'normal', hasShadow: false }]
     }));
   }
 

@@ -104,6 +104,25 @@ import { BadgeDesign, Decoration, DecorationType } from '../services/gemini.serv
               </div>
           </div>
 
+          <!-- Border & Shadow -->
+          <div class="space-y-3 pt-3 border-t border-gray-100">
+            <label class="block text-xs font-medium text-gray-500">Border & Shadow</label>
+            <div class="grid grid-cols-2 gap-4">
+              <div class="space-y-1">
+                <label class="text-xs text-gray-500">Width: {{store.badge().borderWidth}}px</label>
+                <input type="range" min="0" max="15" [ngModel]="store.badge().borderWidth" (ngModelChange)="store.update({borderWidth: +$event})" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+              </div>
+              <div class="flex flex-col gap-1">
+                 <label class="text-xs text-gray-500">Color</label>
+                 <input type="color" [ngModel]="store.badge().borderColor" (ngModelChange)="store.update({borderColor: $event})" class="h-8 w-full rounded cursor-pointer border border-gray-200 p-0 bg-white">
+              </div>
+            </div>
+             <div class="flex items-center gap-2">
+                <input type="checkbox" id="shadowToggle" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" [ngModel]="store.badge().hasShadow" (ngModelChange)="store.update({hasShadow: $event})">
+                <label for="shadowToggle" class="text-xs font-medium text-gray-700">Enable Badge Shadow</label>
+            </div>
+          </div>
+
           <!-- Font Selection -->
            <div class="bg-gray-50 p-3 rounded-lg border border-gray-100">
              <label class="block text-xs font-medium text-gray-500 mb-1">Font Family</label>
@@ -128,11 +147,16 @@ import { BadgeDesign, Decoration, DecorationType } from '../services/gemini.serv
             <div class="bg-gray-50 p-3 rounded-lg border border-gray-100">
                <div class="flex justify-between items-center mb-1">
                  <label class="text-xs font-medium text-gray-500">Title</label>
-                 <input type="range" min="10" max="40" 
-                   [ngModel]="store.badge().titleSettings?.size || 18" 
-                   (ngModelChange)="updateSize('title', $event)"
-                   class="w-20 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                 >
+                 <div class="flex items-center gap-1">
+                    <button (click)="toggleStyle('title', 'fontWeight')" class="w-5 h-5 text-xs rounded border bg-white flex items-center justify-center" [class.bg-blue-100]="store.badge().titleSettings?.fontWeight === 'bold'" [class.text-blue-600]="store.badge().titleSettings?.fontWeight === 'bold'" [class.border-blue-200]="store.badge().titleSettings?.fontWeight === 'bold'"><b>B</b></button>
+                    <button (click)="toggleStyle('title', 'fontStyle')" class="w-5 h-5 text-xs rounded border bg-white flex items-center justify-center" [class.bg-blue-100]="store.badge().titleSettings?.fontStyle === 'italic'" [class.text-blue-600]="store.badge().titleSettings?.fontStyle === 'italic'" [class.border-blue-200]="store.badge().titleSettings?.fontStyle === 'italic'"><i>I</i></button>
+                    <button (click)="toggleShadow('title')" class="w-5 h-5 text-xs rounded border bg-white flex items-center justify-center" [class.bg-blue-100]="store.badge().titleSettings?.hasShadow" [class.text-blue-600]="store.badge().titleSettings?.hasShadow" [class.border-blue-200]="store.badge().titleSettings?.hasShadow"><b>S</b></button>
+                    <input type="range" min="10" max="40" 
+                      [ngModel]="store.badge().titleSettings?.size || 18" 
+                      (ngModelChange)="updateSize('title', $event)"
+                      class="w-20 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    >
+                 </div>
                </div>
                <input type="text" 
                   [ngModel]="store.badge().title" (ngModelChange)="store.update({title: $event})"
@@ -144,11 +168,16 @@ import { BadgeDesign, Decoration, DecorationType } from '../services/gemini.serv
             <div class="bg-gray-50 p-3 rounded-lg border border-gray-100">
                <div class="flex justify-between items-center mb-1">
                  <label class="text-xs font-medium text-gray-500">Subtitle</label>
-                 <input type="range" min="8" max="30" 
-                   [ngModel]="store.badge().subtitleSettings?.size || 12" 
-                   (ngModelChange)="updateSize('subtitle', $event)"
-                   class="w-20 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                 >
+                  <div class="flex items-center gap-1">
+                    <button (click)="toggleStyle('subtitle', 'fontWeight')" class="w-5 h-5 text-xs rounded border bg-white flex items-center justify-center" [class.bg-blue-100]="store.badge().subtitleSettings?.fontWeight === 'bold'" [class.text-blue-600]="store.badge().subtitleSettings?.fontWeight === 'bold'" [class.border-blue-200]="store.badge().subtitleSettings?.fontWeight === 'bold'"><b>B</b></button>
+                    <button (click)="toggleStyle('subtitle', 'fontStyle')" class="w-5 h-5 text-xs rounded border bg-white flex items-center justify-center" [class.bg-blue-100]="store.badge().subtitleSettings?.fontStyle === 'italic'" [class.text-blue-600]="store.badge().subtitleSettings?.fontStyle === 'italic'" [class.border-blue-200]="store.badge().subtitleSettings?.fontStyle === 'italic'"><i>I</i></button>
+                    <button (click)="toggleShadow('subtitle')" class="w-5 h-5 text-xs rounded border bg-white flex items-center justify-center" [class.bg-blue-100]="store.badge().subtitleSettings?.hasShadow" [class.text-blue-600]="store.badge().subtitleSettings?.hasShadow" [class.border-blue-200]="store.badge().subtitleSettings?.hasShadow"><b>S</b></button>
+                    <input type="range" min="8" max="30" 
+                      [ngModel]="store.badge().subtitleSettings?.size || 12" 
+                      (ngModelChange)="updateSize('subtitle', $event)"
+                      class="w-20 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    >
+                  </div>
                </div>
                <input type="text" 
                   [ngModel]="store.badge().subtitle" (ngModelChange)="store.update({subtitle: $event})"
@@ -160,11 +189,16 @@ import { BadgeDesign, Decoration, DecorationType } from '../services/gemini.serv
              <div class="bg-gray-50 p-3 rounded-lg border border-gray-100">
                <div class="flex justify-between items-center mb-1">
                  <label class="text-xs font-medium text-gray-500">Accent / Year</label>
-                 <input type="range" min="8" max="30" 
-                   [ngModel]="store.badge().accentSettings?.size || 10" 
-                   (ngModelChange)="updateSize('accent', $event)"
-                   class="w-20 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                 >
+                  <div class="flex items-center gap-1">
+                    <button (click)="toggleStyle('accent', 'fontWeight')" class="w-5 h-5 text-xs rounded border bg-white flex items-center justify-center" [class.bg-blue-100]="store.badge().accentSettings?.fontWeight === 'bold'" [class.text-blue-600]="store.badge().accentSettings?.fontWeight === 'bold'" [class.border-blue-200]="store.badge().accentSettings?.fontWeight === 'bold'"><b>B</b></button>
+                    <button (click)="toggleStyle('accent', 'fontStyle')" class="w-5 h-5 text-xs rounded border bg-white flex items-center justify-center" [class.bg-blue-100]="store.badge().accentSettings?.fontStyle === 'italic'" [class.text-blue-600]="store.badge().accentSettings?.fontStyle === 'italic'" [class.border-blue-200]="store.badge().accentSettings?.fontStyle === 'italic'"><i>I</i></button>
+                    <button (click)="toggleShadow('accent')" class="w-5 h-5 text-xs rounded border bg-white flex items-center justify-center" [class.bg-blue-100]="store.badge().accentSettings?.hasShadow" [class.text-blue-600]="store.badge().accentSettings?.hasShadow" [class.border-blue-200]="store.badge().accentSettings?.hasShadow"><b>S</b></button>
+                    <input type="range" min="8" max="30" 
+                      [ngModel]="store.badge().accentSettings?.size || 10" 
+                      (ngModelChange)="updateSize('accent', $event)"
+                      class="w-20 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    >
+                  </div>
                </div>
                <input type="text" 
                   [ngModel]="store.badge().accentText" (ngModelChange)="store.update({accentText: $event})"
@@ -224,7 +258,9 @@ import { BadgeDesign, Decoration, DecorationType } from '../services/gemini.serv
                         <div class="flex gap-2 items-center">
                            <input type="color" [ngModel]="txt.color" (ngModelChange)="store.updateExtraText(txt.id, {color: $event})" class="w-4 h-4 p-0 border-0 rounded bg-white cursor-pointer">
                            <input type="range" min="8" max="40" [value]="txt.size" (input)="store.updateExtraText(txt.id, {size: +$any($event.target).value})" class="w-16 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
-                           <button (click)="store.updateExtraText(txt.id, {weight: txt.weight === 'bold' ? 'normal' : 'bold'})" [class.font-bold]="txt.weight === 'bold'" class="text-xs w-5 h-5 flex items-center justify-center border rounded bg-white">B</button>
+                           <button (click)="store.updateExtraText(txt.id, {fontWeight: txt.fontWeight === 'bold' ? 'normal' : 'bold'})" [class.font-bold]="txt.fontWeight === 'bold'" class="text-xs w-5 h-5 flex items-center justify-center border rounded bg-white"><b>B</b></button>
+                           <button (click)="store.updateExtraText(txt.id, {fontStyle: txt.fontStyle === 'italic' ? 'normal' : 'italic'})" [class.italic]="txt.fontStyle === 'italic'" class="text-xs w-5 h-5 flex items-center justify-center border rounded bg-white"><i>I</i></button>
+                           <button (click)="store.updateExtraText(txt.id, {hasShadow: !txt.hasShadow})" class="text-xs w-5 h-5 flex items-center justify-center border rounded bg-white" [class.bg-blue-100]="txt.hasShadow" [class.text-blue-600]="txt.hasShadow" [class.border-blue-200]="txt.hasShadow"><b>S</b></button>
                         </div>
                      </div>
                   }
@@ -330,6 +366,26 @@ export class BadgeControlsComponent {
     this.store.updateElement(element, { size: Number(size) });
   }
 
+  toggleStyle(element: 'title' | 'subtitle' | 'accent', style: 'fontWeight' | 'fontStyle') {
+    const key = `${element}Settings` as const;
+    const settings = this.store.badge()[key];
+    if (settings) {
+        if (style === 'fontWeight') {
+            this.store.updateElement(element, { fontWeight: settings.fontWeight === 'bold' ? 'normal' : 'bold' });
+        } else if (style === 'fontStyle') {
+            this.store.updateElement(element, { fontStyle: settings.fontStyle === 'italic' ? 'normal' : 'italic' });
+        }
+    }
+  }
+
+  toggleShadow(element: 'title' | 'subtitle' | 'accent') {
+    const key = `${element}Settings` as const;
+    const settings = this.store.badge()[key];
+    if (settings) {
+        this.store.updateElement(element, { hasShadow: !settings.hasShadow });
+    }
+  }
+
   uploadLogo(event: Event) {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
@@ -385,8 +441,10 @@ export class BadgeControlsComponent {
       y: 100,
       size: 14,
       color: '#ffffff',
-      weight: 'bold',
-      rotation: 0
+      rotation: 0,
+      fontWeight: 'bold',
+      fontStyle: 'normal',
+      hasShadow: false
     });
   }
 }
