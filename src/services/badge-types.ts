@@ -60,10 +60,3 @@ export interface BadgeDesign {
   decorations: Decoration[];
   extraTexts: ExtraText[];
 }
-
-@Injectable({
-  providedIn: 'root'
-})
-export class GeminiService {
-  constructor() {}
-}

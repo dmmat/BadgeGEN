@@ -1,5 +1,5 @@
 {
-  "name": "BadgeGen AI",
-  "description": "A powerful certification badge generator powered by Gemini AI. Design custom badges, certificates, and awards with AI assistance, then export them as high-quality images.",
+  "name": "BadgeGen",
+  "description": "A powerful certification badge generator. Design custom badges, certificates, and awards, then export them as high-quality images.",
   "requestFramePermissions": []
 }

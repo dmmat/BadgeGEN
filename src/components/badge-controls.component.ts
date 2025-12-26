@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { BadgeStore } from '../services/badge.store';
-import { BadgeDesign, Decoration, DecorationType } from '../services/gemini.service';
+import { BadgeDesign, Decoration, DecorationType } from '../services/badge-types';
 
 @Component({
   selector: 'app-badge-controls',

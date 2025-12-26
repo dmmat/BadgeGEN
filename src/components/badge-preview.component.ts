@@ -1,5 +1,5 @@
 import { Component, input, ElementRef, viewChild, inject, signal, effect } from '@angular/core';
-import { BadgeDesign, LayoutSettings } from '../services/gemini.service';
+import { BadgeDesign, LayoutSettings } from '../services/badge-types';
 import { BadgeStore } from '../services/badge.store';
 import { NgClass } from '@angular/common';
 

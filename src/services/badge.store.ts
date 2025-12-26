@@ -1,5 +1,5 @@
 import { Injectable, signal, computed } from '@angular/core';
-import { BadgeDesign, LayoutSettings, Decoration, ExtraText } from './gemini.service';
+import { BadgeDesign, LayoutSettings, Decoration, ExtraText } from './badge-types';
 
 const DEFAULT_LAYOUT = {
   title: { x: 100, y: 120, size: 18 },
