@@ -2,6 +2,9 @@ export interface LayoutSettings {
   x: number;
   y: number;
   size: number;
+  fontWeight: 'normal' | 'bold';
+  fontStyle: 'normal' | 'italic';
+  hasShadow: boolean;
 }
 
 export type DecorationType = 
@@ -27,7 +30,9 @@ export interface ExtraText {
   size: number;
   color: string;
   font?: string;
-  weight: 'normal' | 'bold';
+  fontWeight: 'normal' | 'bold';
+  fontStyle: 'normal' | 'italic';
+  hasShadow: boolean;
   rotation: number;
 }
 
@@ -42,6 +47,11 @@ export interface BadgeDesign {
   emoji: string;
   font: string;
   
+  // Border & Shadow
+  borderWidth: number;
+  borderColor: string;
+  hasShadow: boolean;
+
   // Gradient Settings
   gradientType: 'linear' | 'radial';
   gradientAngle: number; // 0-360 for linear
@@ -52,7 +62,7 @@ export interface BadgeDesign {
   titleSettings?: LayoutSettings;
   subtitleSettings?: LayoutSettings;
   accentSettings?: LayoutSettings;
-  iconSettings?: LayoutSettings;
+  iconSettings?: Omit<LayoutSettings, 'fontWeight' | 'fontStyle' | 'hasShadow'>;
 
   // Extra Elements
   decorations: Decoration[];
