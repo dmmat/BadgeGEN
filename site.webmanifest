@@ -1,0 +1,20 @@
+{
+  "name": "BadgeGen KS",
+  "short_name": "BadgeGen",
+  "description": "BadgeGen KS helps designers and community managers craft premium certification badges, awards, and shareable credentials in seconds.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f172a",
+  "lang": "en",
+  "categories": ["productivity", "design", "graphics"],
+  "icons": [
+    {
+      "src": "/assets/favicon.svg",
+      "sizes": "128x128",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

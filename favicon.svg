@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">BadgeGen KS Icon</title>
+  <desc id="desc">Gradient shield icon with stylized BG monogram</desc>
+  <defs>
+    <linearGradient id="badgeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <filter id="softShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="#f1f5f9"/>
+  <path d="M32 20h64l-4 44-28 44-28-44z" fill="url(#badgeGrad)" filter="url(#softShadow)"/>
+  <text x="64" y="78" font-family="'Inter', 'Segoe UI', sans-serif" font-size="40" font-weight="700" text-anchor="middle" fill="#f8fafc">BG</text>
+</svg>
