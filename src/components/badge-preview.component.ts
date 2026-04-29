@@ -358,6 +358,13 @@ interface Selection {
              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
              SVG
           </button>
+          <button (click)="downloadJson()" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1" aria-label="Save design as JSON" title="Save design as .badge.json">
+             JSON
+          </button>
+          <label class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer" title="Load design from .badge.json">
+             Load
+             <input type="file" accept="application/json,.json" class="hidden" (change)="loadJson($event)" />
+          </label>
         </div>
       </div>
     </div>
@@ -634,6 +641,34 @@ export class BadgePreviewComponent {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  }
+
+  downloadJson() {
+    const blob = new Blob([this.store.exportJson()], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    this.triggerDownload(url, `badge-${Date.now()}.badge.json`);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    this.toast.success('Design saved');
+  }
+
+  loadJson(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result ?? '');
+      const ok = this.store.importJson(text);
+      if (ok) {
+        this.toast.success('Design loaded');
+        this.selection.set(null);
+      } else {
+        this.toast.error('Invalid badge JSON');
+      }
+    };
+    reader.onerror = () => this.toast.error('Could not read file');
+    reader.readAsText(file);
+    input.value = '';
   }
 
   private ensureFontLoaded(font?: string) {

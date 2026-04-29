@@ -1,5 +1,7 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, effect } from '@angular/core';
 import { BadgeDesign, LayoutSettings, Decoration, ExtraText } from './badge-types';
+
+const AUTOSAVE_KEY = 'badgegen:autosave:v1';
 
 const DEFAULT_LAYOUT = {
   title: { x: 100, y: 120, size: 18, fontWeight: 'bold', fontStyle: 'normal', hasShadow: true } as LayoutSettings,
@@ -57,9 +59,21 @@ export class BadgeStore {
   private readonly redoCount = signal(0);
   private debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
   private debounceBaselines: Record<string, BadgeDesign | undefined> = {};
+  private autosaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private autosaveEnabled = false;
 
   readonly canUndo = computed(() => this.undoCount() > 0);
   readonly canRedo = computed(() => this.redoCount() > 0);
+
+  constructor() {
+    this.hydrateFromAutosave();
+    this.autosaveEnabled = true;
+    effect(() => {
+      const snapshot = this.state();
+      if (!this.autosaveEnabled) return;
+      this.scheduleAutosave(snapshot);
+    });
+  }
 
   // Actions
   update(partial: Partial<BadgeDesign>) {
@@ -282,5 +296,57 @@ export class BadgeStore {
   private syncHistorySignals() {
     this.undoCount.set(this.undoStack.length);
     this.redoCount.set(this.redoStack.length);
+  }
+
+  // JSON export / import
+  exportJson(): string {
+    return JSON.stringify(this.state(), null, 2);
+  }
+
+  importJson(json: string): boolean {
+    try {
+      const parsed = JSON.parse(json) as Partial<BadgeDesign>;
+      const merged: BadgeDesign = {
+        ...createDefaultBadge(),
+        ...parsed,
+        decorations: parsed.decorations ?? [],
+        extraTexts: parsed.extraTexts ?? []
+      };
+      this.commit(merged);
+      return true;
+    } catch (e) {
+      console.error('Invalid badge JSON', e);
+      return false;
+    }
+  }
+
+  clearAutosave() {
+    try { localStorage.removeItem(AUTOSAVE_KEY); } catch {}
+  }
+
+  private scheduleAutosave(snapshot: BadgeDesign) {
+    if (typeof localStorage === 'undefined') return;
+    if (this.autosaveTimer) clearTimeout(this.autosaveTimer);
+    this.autosaveTimer = setTimeout(() => {
+      try {
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(snapshot));
+      } catch (e) {
+        console.warn('Autosave failed', e);
+      }
+    }, 500);
+  }
+
+  private hydrateFromAutosave() {
+    if (typeof localStorage === 'undefined') return;
+    // Skip hydration when a shared design is already present in the URL
+    if (typeof location !== 'undefined' && location.hash && location.hash.length > 1) return;
+    try {
+      const raw = localStorage.getItem(AUTOSAVE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<BadgeDesign>;
+      this.state.set({ ...createDefaultBadge(), ...parsed });
+    } catch (e) {
+      console.warn('Autosave restore failed', e);
+    }
   }
 }
