@@ -1,6 +1,10 @@
-import { Component, ElementRef, HostListener, viewChild, inject, signal, computed, effect } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, HostListener, viewChild, inject, signal, computed, effect } from '@angular/core';
 import { BadgeStore } from '../services/badge.store';
 import { ToastService } from '../services/toast.service';
+import { SHAPE_DEFS, ShapeLayer, LayerStroke } from '../services/shape-defs';
+
+const VIEWBOX = 200;
+const CENTER = 100;
 
 type DraggableType = 'title' | 'subtitle' | 'accent' | 'icon' | 'decoration' | 'extraText';
 
@@ -64,73 +68,54 @@ interface Selection {
             </style>
           </defs>
           
-          <g 
+          <g
             [attr.filter]="design().hasShadow ? 'url(#shadow)' : 'none'"
             [attr.transform]="shapeTransform"
           >
-            <!-- Shapes -->
-            @switch (design().shape) {
-              @case ('circle') {
-                <circle cx="100" cy="100" r="90" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth" />
-                <circle cx="100" cy="100" r="80" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" opacity="0.5" stroke-dasharray="4 2" />
-              }
-              @case ('shield') {
-                <path d="M100 10 L180 50 V110 C180 155 145 185 100 195 C55 185 20 155 20 110 V50 L100 10 Z" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth" />
-                <path d="M100 20 L170 55 V105 C170 145 140 170 100 180 C60 170 30 145 30 105 V55 L100 20 Z" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" opacity="0.3" />
-              }
-              @case ('hexagon') {
-                <polygon points="100,10 190,55 190,145 100,190 10,145 10,55" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth" />
-                <polygon points="100,20 180,60 180,140 100,180 20,140 20,60" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" opacity="0.4" />
-              }
-              @case ('star') {
-                 <polygon points="100,10 123,75 190,78 138,115 155,180 100,145 45,180 62,115 10,78 77,75" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-              }
-              @case ('ribbon') {
-                 <path d="M40 20 H160 V140 L100 110 L40 140 V20 Z" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-                 <rect x="30" y="10" width="140" height="15" rx="5" [attr.fill]="design().secondaryColor" [attr.stroke]="design().borderColor" stroke-width="2"/>
-              }
-              @case ('diamond') {
-                 <polygon points="100,10 190,100 100,190 10,100" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-                 <polygon points="100,25 175,100 100,175 25,100" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" opacity="0.4"/>
-              }
-              @case ('octagon') {
-                 <polygon points="60,10 140,10 190,60 190,140 140,190 60,190 10,140 10,60" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-                 <polygon points="65,20 135,20 180,65 180,135 135,180 65,180 20,135 20,65" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" opacity="0.4"/>
-              }
-              @case ('award') {
-                 <!-- Ribbons behind -->
-                 <path d="M70 150 L50 190 L85 180 L100 195 L115 180 L150 190 L130 150" [attr.fill]="design().secondaryColor" [attr.stroke]="design().borderColor" stroke-width="2"/>
-                 <!-- Main Circle -->
-                 <circle cx="100" cy="90" r="70" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-                 <circle cx="100" cy="90" r="60" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" stroke-dasharray="2 2" opacity="0.6"/>
-              }
-              @case ('plaque') {
-                 <rect x="20" y="30" width="160" height="140" rx="10" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-                 <rect x="30" y="40" width="140" height="120" rx="5" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" opacity="0.4"/>
-              }
-              @case ('gem') {
-                 <path d="M50 30 L150 30 L190 80 L100 180 L10 80 Z" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-                 <path d="M50 30 L100 100 M150 30 L100 100 M190 80 L100 100 M10 80 L100 100 M100 180 L100 100" [attr.stroke]="design().borderColor" stroke-width="1" opacity="0.5"/>
-              }
-              @case ('leaf-1') {
-                 <path d="M 30 90 Q 30 30 90 30 L 170 30 L 170 110 Q 170 170 110 170 L 30 170 Z" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-                 <path d="M 40 95 Q 40 40 95 40 L 160 40 L 160 105 Q 160 160 105 160 L 40 160 Z" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" opacity="0.4"/>
-              }
-              @case ('leaf-2') {
-                 <path d="M 30 30 L 110 30 Q 170 30 170 90 L 170 170 L 90 170 Q 30 170 30 110 Z" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-                 <path d="M 40 40 L 105 40 Q 160 40 160 95 L 160 160 L 95 160 Q 40 160 40 105 Z" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" opacity="0.4"/>
-              }
-              @case ('seal') {
-                 <path d="M100 10 L115 15 L122 25 L135 35 L145 50 L155 65 L165 80 L160 95 L165 110 L155 125 L145 140 L135 155 L122 165 L115 175 L100 180 L85 175 L78 165 L65 155 L55 140 L45 125 L35 110 L40 95 L35 80 L45 65 L55 50 L65 35 L78 25 L85 15 Z" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-                 <circle cx="100" cy="95" r="70" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" stroke-dasharray="3 3" opacity="0.5"/>
-              }
-              @case ('banner') {
-                 <path d="M 30 10 H 170 V 150 L 100 190 L 30 150 Z" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-                 <rect x="40" y="20" width="120" height="120" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" opacity="0.3"/>
-              }
-              @case ('shield-modern') {
-                 <path d="M 30 20 H 170 L 160 120 L 100 190 L 40 120 Z" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-                 <path d="M 45 30 H 155 L 148 110 L 100 170 L 52 110 Z" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" opacity="0.4"/>
+            @for (layer of shapeLayers(); track $index) {
+              @switch (layer.kind) {
+                @case ('circle') {
+                  <circle [attr.cx]="layer.cx" [attr.cy]="layer.cy" [attr.r]="layer.r"
+                    [attr.fill]="fillFor(layer.fill)"
+                    [attr.stroke]="design().borderColor"
+                    [attr.stroke-width]="strokeWidthFor(layer.stroke)"
+                    [attr.stroke-opacity]="layer.stroke?.opacity ?? null"
+                    [attr.stroke-dasharray]="layer.stroke?.dasharray ?? null"
+                    [attr.opacity]="layer.stroke?.opacity ?? null"
+                  />
+                }
+                @case ('rect') {
+                  <rect [attr.x]="layer.x" [attr.y]="layer.y"
+                    [attr.width]="layer.width" [attr.height]="layer.height"
+                    [attr.rx]="layer.rx ?? null"
+                    [attr.fill]="fillFor(layer.fill)"
+                    [attr.stroke]="design().borderColor"
+                    [attr.stroke-width]="strokeWidthFor(layer.stroke)"
+                    [attr.stroke-opacity]="layer.stroke?.opacity ?? null"
+                    [attr.stroke-dasharray]="layer.stroke?.dasharray ?? null"
+                    [attr.opacity]="layer.stroke?.opacity ?? null"
+                  />
+                }
+                @case ('polygon') {
+                  <polygon [attr.points]="layer.points"
+                    [attr.fill]="fillFor(layer.fill)"
+                    [attr.stroke]="design().borderColor"
+                    [attr.stroke-width]="strokeWidthFor(layer.stroke)"
+                    [attr.stroke-opacity]="layer.stroke?.opacity ?? null"
+                    [attr.stroke-dasharray]="layer.stroke?.dasharray ?? null"
+                    [attr.opacity]="layer.stroke?.opacity ?? null"
+                  />
+                }
+                @case ('path') {
+                  <path [attr.d]="layer.d"
+                    [attr.fill]="fillFor(layer.fill)"
+                    [attr.stroke]="design().borderColor"
+                    [attr.stroke-width]="strokeWidthFor(layer.stroke)"
+                    [attr.stroke-opacity]="layer.stroke?.opacity ?? null"
+                    [attr.stroke-dasharray]="layer.stroke?.dasharray ?? null"
+                    [attr.opacity]="layer.stroke?.opacity ?? null"
+                  />
+                }
               }
             }
           </g>
@@ -369,22 +354,34 @@ interface Selection {
       </div>
     </div>
   `,
-  standalone: true
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class BadgePreviewComponent {
-  private static readonly CENTER = 100;
   private static readonly loadedFonts = new Set<string>();
-  readonly CENTER = BadgePreviewComponent.CENTER;
-  
+  readonly CENTER = CENTER;
+
   get shapeTransform() {
     const scale = (this.design().shapeScale || 100) / 100;
-    const c = this.CENTER;
-    return `translate(${c} ${c}) scale(${scale}) translate(-${c} -${c})`;
+    return `translate(${CENTER} ${CENTER}) scale(${scale}) translate(-${CENTER} -${CENTER})`;
   }
   store = inject(BadgeStore);
   private toast = inject(ToastService);
   design = this.store.badge;
+  readonly shapeLayers = computed<ShapeLayer[]>(() => SHAPE_DEFS[this.design().shape]);
   captureContainer = viewChild<ElementRef>('captureContainer');
+
+  fillFor(fill: ShapeLayer['fill']): string {
+    if (fill === 'gradient') return 'url(#mainGradient)';
+    if (fill === 'secondary') return this.design().secondaryColor;
+    return 'none';
+  }
+
+  strokeWidthFor(stroke?: LayerStroke): number | null {
+    if (!stroke) return null;
+    if (stroke.useBorderWidth) return this.design().borderWidth;
+    return stroke.width ?? 1;
+  }
   private readonly fontLoaderEffect = effect(() => {
     this.ensureFontLoaded(this.design().font);
   });
@@ -428,7 +425,7 @@ export class BadgePreviewComponent {
     const svgRect = this.captureContainer()?.nativeElement.getBoundingClientRect();
     if (!svgRect) return;
 
-    const scaleFactor = 200 / svgRect.width;
+    const scaleFactor = VIEWBOX / svgRect.width;
     const dx = (event.clientX - this.dragState.startX) * scaleFactor;
     const dy = (event.clientY - this.dragState.startY) * scaleFactor;
 
@@ -436,7 +433,6 @@ export class BadgePreviewComponent {
     let newY = this.dragState.elementStartY + dy;
 
     const SNAP_THRESHOLD = 3;
-    const CENTER = 100;
 
     if (Math.abs(newX - CENTER) < SNAP_THRESHOLD) {
       newX = CENTER;

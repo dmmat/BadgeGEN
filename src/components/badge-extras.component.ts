@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { BadgeStore } from '../services/badge.store';
 import { DecorationType } from '../services/badge-types';
@@ -7,6 +7,7 @@ import { DecorationType } from '../services/badge-types';
   selector: 'app-badge-extras',
   standalone: true,
   imports: [FormsModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-4">
       <div>

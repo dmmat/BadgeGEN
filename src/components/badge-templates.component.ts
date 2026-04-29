@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { BadgeStore } from '../services/badge.store';
 import { BADGE_TEMPLATES, BadgeTemplate } from '../services/badge-templates';
 import { ToastService } from '../services/toast.service';
@@ -6,6 +6,7 @@ import { ToastService } from '../services/toast.service';
 @Component({
   selector: 'app-badge-templates',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-2">
       <p class="text-[11px] uppercase tracking-wide text-gray-400">Templates</p>

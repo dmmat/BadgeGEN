@@ -1,4 +1,4 @@
-import { Component, inject, OnDestroy, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnDestroy, OnInit } from '@angular/core';
 import { BadgePreviewComponent } from './components/badge-preview.component';
 import { BadgeMainControlsComponent } from './components/badge-main-controls.component';
 import { BadgeExtrasComponent } from './components/badge-extras.component';
@@ -9,7 +9,8 @@ import { ToastService } from './services/toast.service';
 @Component({
   selector: 'app-root',
   imports: [BadgePreviewComponent, BadgeMainControlsComponent, BadgeExtrasComponent, ToastHostComponent],
-  templateUrl: './app.component.html'
+  templateUrl: './app.component.html',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AppComponent implements OnInit, OnDestroy {
   store = inject(BadgeStore);
