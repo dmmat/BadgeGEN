@@ -121,22 +121,24 @@ import { DecorationType } from '../services/badge-types';
       <div class="bg-gray-50 p-3 rounded-lg border border-gray-100">
         <div class="flex justify-between items-center mb-2">
           <label class="text-xs font-medium text-gray-500">Logo</label>
-          <input type="range" min="20" max="100" 
-            [ngModel]="store.badge().iconSettings?.size || 40" 
+          <input type="range" min="20" max="100"
+            [ngModel]="store.badge().iconSettings?.size || 40"
             (ngModelChange)="updateSize('icon', $event)"
             class="w-20 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+            aria-label="Icon size"
           >
         </div>
         <div class="flex gap-2">
-          <input type="text" 
-            [ngModel]="store.badge().emoji" 
+          <input type="text"
+            [ngModel]="store.badge().emoji"
             (ngModelChange)="store.update({emoji: $event, customLogo: undefined})"
             placeholder="Emoji"
             class="flex-1 text-sm rounded-md border-gray-300 shadow-sm focus:border-blue-500 px-2 py-1 bg-white text-gray-900"
+            aria-label="Icon emoji"
           >
           <div class="relative">
-            <input 
-              type="file" 
+            <input
+              type="file"
               accept="image/*"
               (change)="uploadLogo($event)"
               class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -146,6 +148,30 @@ import { DecorationType } from '../services/badge-types';
               Upload
             </button>
           </div>
+        </div>
+        <div class="flex items-center gap-2 mt-2">
+          <div class="inline-flex rounded-md border border-gray-200 overflow-hidden text-xs">
+            <button (click)="store.update({iconStyle: 'emoji'})"
+              [class.bg-blue-100]="store.badge().iconStyle !== 'mono'"
+              [class.text-blue-700]="store.badge().iconStyle !== 'mono'"
+              class="px-2 py-1 bg-white text-gray-700"
+              aria-label="Use color emoji"
+            >Emoji</button>
+            <button (click)="store.update({iconStyle: 'mono'})"
+              [class.bg-blue-100]="store.badge().iconStyle === 'mono'"
+              [class.text-blue-700]="store.badge().iconStyle === 'mono'"
+              class="px-2 py-1 bg-white text-gray-700 border-l border-gray-200"
+              aria-label="Use monochrome icon"
+            >Mono</button>
+          </div>
+          @if (store.badge().iconStyle === 'mono') {
+            <input type="color"
+              [ngModel]="store.badge().iconColor"
+              (ngModelChange)="store.update({iconColor: $event})"
+              class="w-7 h-7 p-0 border border-gray-200 rounded bg-white cursor-pointer"
+              aria-label="Icon color"
+            >
+          }
         </div>
       </div>
 
