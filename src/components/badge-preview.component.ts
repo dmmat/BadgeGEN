@@ -1,5 +1,6 @@
 import { Component, ElementRef, HostListener, viewChild, inject, signal, computed, effect } from '@angular/core';
 import { BadgeStore } from '../services/badge.store';
+import { ToastService } from '../services/toast.service';
 
 type DraggableType = 'title' | 'subtitle' | 'accent' | 'icon' | 'decoration' | 'extraText';
 
@@ -321,15 +322,15 @@ interface Selection {
           
           <!-- Snapping Guides -->
           @if (isDragging()) {
-             <line x1="100" y1="0" x2="100" y2="200" stroke="#3B82F6" stroke-width="0.5" stroke-dasharray="4 2"
+             <line data-export-skip="true" x1="100" y1="0" x2="100" y2="200" stroke="#3B82F6" stroke-width="0.5" stroke-dasharray="4 2"
                 [class.opacity-0]="!snappedX()" [class.opacity-100]="snappedX()" />
-             <line x1="0" y1="100" x2="200" y2="100" stroke="#3B82F6" stroke-width="0.5" stroke-dasharray="4 2"
+             <line data-export-skip="true" x1="0" y1="100" x2="200" y2="100" stroke="#3B82F6" stroke-width="0.5" stroke-dasharray="4 2"
                 [class.opacity-0]="!snappedY()" [class.opacity-100]="snappedY()" />
           }
 
           <!-- Selection Indicator -->
           @if (selectionAnchor(); as anchor) {
-             <g style="pointer-events: none;">
+             <g data-export-skip="true" style="pointer-events: none;">
                 <circle [attr.cx]="anchor.x" [attr.cy]="anchor.y" r="14" fill="none" stroke="#3B82F6" stroke-width="0.8" stroke-dasharray="3 2" opacity="0.9"/>
                 <circle [attr.cx]="anchor.x" [attr.cy]="anchor.y" r="1.5" fill="#3B82F6"/>
              </g>
@@ -349,9 +350,13 @@ interface Selection {
           />
           <span class="text-xs text-gray-600">{{store.badge().canvasSize || 1000}}px</span>
 
-          <button (click)="downloadPng()" class="ml-3 bg-gray-900 hover:bg-black text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-lg flex items-center gap-1">
+          <button (click)="downloadPng()" class="ml-3 bg-gray-900 hover:bg-black text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-lg flex items-center gap-1" aria-label="Download PNG">
              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
              PNG
+          </button>
+          <button (click)="downloadSvg()" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1" aria-label="Download SVG">
+             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+             SVG
           </button>
         </div>
       </div>
@@ -370,6 +375,7 @@ export class BadgePreviewComponent {
     return `translate(${c} ${c}) scale(${scale}) translate(-${c} -${c})`;
   }
   store = inject(BadgeStore);
+  private toast = inject(ToastService);
   design = this.store.badge;
   captureContainer = viewChild<ElementRef>('captureContainer');
   private readonly fontLoaderEffect = effect(() => {
@@ -547,52 +553,87 @@ export class BadgePreviewComponent {
   }
 
   async downloadPng() {
-    const svgElement = this.captureContainer()?.nativeElement.querySelector('svg');
-    if (!svgElement) return;
-
-    // Clone to manipulate for export without affecting view
-    const svgClone = svgElement.cloneNode(true) as SVGElement;
-    
-    // Attempt to inline font for better export (Basic Google Fonts support)
-    const fontName = this.design().font;
-    const fontUrl = `https://fonts.googleapis.com/css2?family=${fontName.replace(/ /g, '+')}:wght@400;700&display=swap`;
-    
-    try {
-        const response = await fetch(fontUrl);
-        const css = await response.text();
-        const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
-        style.textContent = `@import url('${fontUrl}');`;
-        svgClone.prepend(style);
-    } catch(e) {
-        console.warn('Font export optimization failed, falling back', e);
-    }
+    const svgClone = await this.prepareExportSvg();
+    if (!svgClone) return;
 
     const svgData = new XMLSerializer().serializeToString(svgClone);
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const img = new Image();
-
     const size = this.design().canvasSize || 1000;
+    const canvas = document.createElement('canvas');
     canvas.width = size;
     canvas.height = size;
+    const ctx = canvas.getContext('2d');
 
     const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(svgBlob);
+    const img = new Image();
 
     img.onload = () => {
       ctx?.drawImage(img, 0, 0, size, size);
-      const pngUrl = canvas.toDataURL('image/png');
-      
-      const downloadLink = document.createElement('a');
-      downloadLink.href = pngUrl;
-      downloadLink.download = `badge-${Date.now()}.png`;
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
+      try {
+        const pngUrl = canvas.toDataURL('image/png');
+        this.triggerDownload(pngUrl, `badge-${Date.now()}.png`);
+        this.toast.success('PNG downloaded');
+      } catch (err) {
+        console.error('PNG export failed', err);
+        this.toast.error('PNG export failed');
+      }
       URL.revokeObjectURL(url);
     };
-
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      this.toast.error('Could not render badge for export');
+    };
     img.src = url;
+  }
+
+  async downloadSvg() {
+    const svgClone = await this.prepareExportSvg();
+    if (!svgClone) return;
+
+    const svgData = '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(svgClone);
+    const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    this.triggerDownload(url, `badge-${Date.now()}.svg`);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    this.toast.success('SVG downloaded');
+  }
+
+  private async prepareExportSvg(): Promise<SVGElement | null> {
+    const svgElement: SVGElement | null = this.captureContainer()?.nativeElement.querySelector('svg') ?? null;
+    if (!svgElement) return null;
+
+    const svgClone = svgElement.cloneNode(true) as SVGElement;
+
+    // Strip transient editor-only nodes (selection indicator, snap guides)
+    svgClone.querySelectorAll('[data-export-skip]').forEach(node => node.remove());
+
+    // Ensure correct namespace + explicit dimensions for downstream tools
+    const size = this.design().canvasSize || 1000;
+    svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    svgClone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+    svgClone.setAttribute('width', String(size));
+    svgClone.setAttribute('height', String(size));
+
+    const fontName = this.design().font;
+    const fontUrl = `https://fonts.googleapis.com/css2?family=${fontName.replace(/ /g, '+')}:wght@400;700&display=swap`;
+    try {
+      const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+      style.textContent = `@import url('${fontUrl}');`;
+      svgClone.prepend(style);
+    } catch (e) {
+      console.warn('Font import failed', e);
+    }
+
+    return svgClone;
+  }
+
+  private triggerDownload(href: string, filename: string) {
+    const link = document.createElement('a');
+    link.href = href;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   private ensureFontLoaded(font?: string) {
