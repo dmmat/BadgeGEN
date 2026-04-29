@@ -25,8 +25,9 @@ interface DragState {
       <div class="w-full flex items-center justify-between mb-4 text-xs">
         <span class="uppercase tracking-wide text-gray-400">Live Preview</span>
         <div class="flex gap-2">
-          <button (click)="store.undo()" [disabled]="!store.canUndo()" class="px-3 py-1 rounded-md border border-gray-200 bg-white text-gray-700 font-semibold disabled:opacity-40">↶ Undo</button>
-          <button (click)="store.redo()" [disabled]="!store.canRedo()" class="px-3 py-1 rounded-md border border-gray-200 bg-white text-gray-700 font-semibold disabled:opacity-40">↷ Redo</button>
+          <button (click)="store.undo()" [disabled]="!store.canUndo()" class="px-3 py-1 rounded-md border border-gray-200 bg-white text-gray-700 font-semibold disabled:opacity-40" title="Undo (Ctrl+Z)">↶ Undo</button>
+          <button (click)="store.redo()" [disabled]="!store.canRedo()" class="px-3 py-1 rounded-md border border-gray-200 bg-white text-gray-700 font-semibold disabled:opacity-40" title="Redo (Ctrl+Shift+Z)">↷ Redo</button>
+          <button (click)="confirmReset()" class="px-3 py-1 rounded-md border border-gray-200 bg-white text-gray-600 font-semibold hover:bg-red-50 hover:text-red-600 hover:border-red-200" title="Reset to default badge">↺ Reset</button>
         </div>
       </div>
       <div #captureContainer class="w-full aspect-square max-w-[700px] flex items-center justify-center relative select-none">
@@ -453,6 +454,12 @@ export class BadgePreviewComponent {
     this.isDragging.set(false);
     this.snappedX.set(false);
     this.snappedY.set(false);
+  }
+
+  confirmReset() {
+    if (window.confirm('Reset the badge to defaults? This clears history.')) {
+      this.store.reset();
+    }
   }
 
   async downloadPng() {

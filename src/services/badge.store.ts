@@ -53,8 +53,13 @@ export class BadgeStore {
   readonly state = signal<BadgeDesign>(createDefaultBadge());
   private undoStack: BadgeDesign[] = [];
   private redoStack: BadgeDesign[] = [];
+  private readonly undoCount = signal(0);
+  private readonly redoCount = signal(0);
   private debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
   private debounceBaselines: Record<string, BadgeDesign | undefined> = {};
+
+  readonly canUndo = computed(() => this.undoCount() > 0);
+  readonly canRedo = computed(() => this.redoCount() > 0);
 
   // Actions
   update(partial: Partial<BadgeDesign>) {
@@ -168,6 +173,7 @@ export class BadgeStore {
       this.state.set({ ...createDefaultBadge(), ...design });
       this.undoStack = [];
       this.redoStack = [];
+      this.syncHistorySignals();
     } catch (e) {
       console.error('Failed to load shared state', e);
     }
@@ -179,6 +185,7 @@ export class BadgeStore {
   reset() {
     this.undoStack = [];
     this.redoStack = [];
+    this.syncHistorySignals();
     this.state.set(createDefaultBadge());
   }
 
@@ -187,6 +194,7 @@ export class BadgeStore {
     const previous = this.undoStack.pop()!;
     const currentSnapshot = cloneDesign(this.state());
     this.redoStack.push(currentSnapshot);
+    this.syncHistorySignals();
     this.state.set(previous);
   }
 
@@ -195,15 +203,8 @@ export class BadgeStore {
     const next = this.redoStack.pop()!;
     const currentSnapshot = cloneDesign(this.state());
     this.undoStack.push(currentSnapshot);
+    this.syncHistorySignals();
     this.state.set(next);
-  }
-
-  canUndo() {
-    return this.undoStack.length > 0;
-  }
-
-  canRedo() {
-    return this.redoStack.length > 0;
   }
 
   private commit(newState: BadgeDesign) {
@@ -213,6 +214,7 @@ export class BadgeStore {
       this.undoStack.shift();
     }
     this.redoStack = [];
+    this.syncHistorySignals();
     this.state.set(cloneDesign(newState));
   }
 
@@ -236,13 +238,18 @@ export class BadgeStore {
       delete this.debounceTimers[key];
       delete this.debounceBaselines[key];
 
-      // Push baseline to undo history and apply final state
       this.undoStack.push(baseline);
       if (this.undoStack.length > MAX_UNDO_HISTORY) {
         this.undoStack.shift();
       }
       this.redoStack = [];
+      this.syncHistorySignals();
       this.state.set(cloneDesign(newState));
     }, ms);
+  }
+
+  private syncHistorySignals() {
+    this.undoCount.set(this.undoStack.length);
+    this.redoCount.set(this.redoStack.length);
   }
 }
