@@ -163,11 +163,16 @@ import { DecorationType } from '../services/badge-types';
                 <button (click)="store.removeExtraText(txt.id)" class="text-red-500">×</button>
               </div>
               <div class="flex gap-2 items-center flex-wrap text-xs">
-                <input type="color" [ngModel]="txt.color" (ngModelChange)="store.updateExtraText(txt.id, {color: $event})" class="w-5 h-5 p-0 border border-gray-200 rounded bg-white cursor-pointer">
-                <input type="range" min="8" max="40" [value]="txt.size" (input)="store.updateExtraText(txt.id, {size: +$any($event.target).value})" class="w-20 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
-                <button (click)="store.updateExtraText(txt.id, {fontWeight: txt.fontWeight === 'bold' ? 'normal' : 'bold'})" [class.font-bold]="txt.fontWeight === 'bold'" class="text-xs w-5 h-5 flex items-center justify-center border rounded bg-white"><b>B</b></button>
-                <button (click)="store.updateExtraText(txt.id, {fontStyle: txt.fontStyle === 'italic' ? 'normal' : 'italic'})" [class.italic]="txt.fontStyle === 'italic'" class="text-xs w-5 h-5 flex items-center justify-center border rounded bg-white"><i>I</i></button>
-                <button (click)="store.updateExtraText(txt.id, {hasShadow: !txt.hasShadow})" class="text-xs w-5 h-5 flex items-center justify-center border rounded bg-white" [class.bg-blue-100]="txt.hasShadow" [class.text-blue-600]="txt.hasShadow" [class.border-blue-200]="txt.hasShadow"><b>S</b></button>
+                <input type="color" [ngModel]="txt.color" (ngModelChange)="store.updateExtraText(txt.id, {color: $event})" class="w-5 h-5 p-0 border border-gray-200 rounded bg-white cursor-pointer" aria-label="Text color">
+                <input type="range" min="8" max="40" [value]="txt.size" (input)="store.updateExtraText(txt.id, {size: +$any($event.target).value})" class="w-20 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" aria-label="Text size">
+                <button (click)="store.updateExtraText(txt.id, {fontWeight: txt.fontWeight === 'bold' ? 'normal' : 'bold'})" [class.font-bold]="txt.fontWeight === 'bold'" class="text-xs w-5 h-5 flex items-center justify-center border rounded bg-white" aria-label="Toggle bold"><b>B</b></button>
+                <button (click)="store.updateExtraText(txt.id, {fontStyle: txt.fontStyle === 'italic' ? 'normal' : 'italic'})" [class.italic]="txt.fontStyle === 'italic'" class="text-xs w-5 h-5 flex items-center justify-center border rounded bg-white" aria-label="Toggle italic"><i>I</i></button>
+                <button (click)="store.updateExtraText(txt.id, {hasShadow: !txt.hasShadow})" class="text-xs w-5 h-5 flex items-center justify-center border rounded bg-white" [class.bg-blue-100]="txt.hasShadow" [class.text-blue-600]="txt.hasShadow" [class.border-blue-200]="txt.hasShadow" aria-label="Toggle shadow"><b>S</b></button>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] text-gray-500 w-8">Rot</span>
+                <input type="range" min="0" max="360" [value]="txt.rotation || 0" (input)="store.updateExtraText(txt.id, {rotation: +$any($event.target).value})" class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" aria-label="Text rotation">
+                <span class="text-[10px] text-gray-500 w-8 text-right">{{txt.rotation || 0}}°</span>
               </div>
             </div>
           }
@@ -208,12 +213,19 @@ import { DecorationType } from '../services/badge-types';
             <h4 class="text-xs font-medium text-gray-500">Layers ({{store.badge().decorations.length}})</h4>
             <div class="space-y-1 max-h-40 overflow-y-auto">
               @for (deco of store.badge().decorations; track deco.id) {
-                <div class="flex items-center justify-between p-2 bg-white rounded border border-gray-200 text-xs">
-                  <span class="capitalize">{{ deco.type }}</span>
+                <div class="p-2 bg-white rounded border border-gray-200 text-xs space-y-1">
+                  <div class="flex items-center justify-between">
+                    <span class="capitalize">{{ deco.type }}</span>
+                    <div class="flex items-center gap-2">
+                      <input type="color" [ngModel]="deco.color || '#ffffff'" (ngModelChange)="store.updateDecoration(deco.id, {color: $event})" class="w-4 h-4 p-0 border-0 rounded cursor-pointer bg-white" aria-label="Decoration color">
+                      <input type="range" min="10" max="60" [value]="deco.size" (input)="store.updateDecoration(deco.id, {size: +$any($event.target).value})" class="w-16 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" aria-label="Decoration size">
+                      <button (click)="store.removeDecoration(deco.id)" class="text-red-500 hover:text-red-700" aria-label="Remove decoration">×</button>
+                    </div>
+                  </div>
                   <div class="flex items-center gap-2">
-                    <input type="color" [ngModel]="deco.color || '#ffffff'" (ngModelChange)="store.updateDecoration(deco.id, {color: $event})" class="w-4 h-4 p-0 border-0 rounded cursor-pointer bg-white" aria-label="Decoration color">
-                    <input type="range" min="10" max="60" [value]="deco.size" (input)="store.updateDecoration(deco.id, {size: +$any($event.target).value})" class="w-16 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
-                    <button (click)="store.removeDecoration(deco.id)" class="text-red-500 hover:text-red-700">×</button>
+                    <span class="text-[10px] text-gray-500 w-8">Rot</span>
+                    <input type="range" min="0" max="360" [value]="deco.rotation || 0" (input)="store.updateDecoration(deco.id, {rotation: +$any($event.target).value})" class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" aria-label="Decoration rotation">
+                    <span class="text-[10px] text-gray-500 w-8 text-right">{{deco.rotation || 0}}°</span>
                   </div>
                 </div>
               }
@@ -229,8 +241,15 @@ export class BadgeExtrasComponent {
 
   decorationTypes: {type: DecorationType, icon: string, label: string}[] = [
     { type: 'star', icon: '★', label: 'Star' },
+    { type: 'heart', icon: '♥', label: 'Heart' },
     { type: 'crown', icon: '👑', label: 'Crown' },
     { type: 'check-mark', icon: '✓', label: 'Check' },
+    { type: 'laurel-wreath', icon: '🏆', label: 'Laurel' },
+    { type: 'ribbon-bow', icon: '🎀', label: 'Ribbon' },
+    { type: 'wing', icon: '🪽', label: 'Wing' },
+    { type: 'sparkles', icon: '✨', label: 'Sparkles' },
+    { type: 'trophy', icon: '🏅', label: 'Trophy' },
+    { type: 'medal', icon: '🥇', label: 'Medal' },
   ];
 
   updateSize(element: 'title' | 'subtitle' | 'accent' | 'icon', size: number) {

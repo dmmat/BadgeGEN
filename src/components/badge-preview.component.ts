@@ -32,7 +32,7 @@ interface DragState {
       <div #captureContainer class="w-full aspect-square max-w-[700px] flex items-center justify-center relative select-none">
         
         <!-- SVG Canvas -->
-        <svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-xl cursor-default" xmlns="http://www.w3.org/2000/svg">
+        <svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-xl cursor-default" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
           <defs>
             @if (design().gradientType === 'radial') {
               <radialGradient id="mainGradient" cx="50%" cy="50%" r="70%" fx="50%" fy="50%">
@@ -130,26 +130,81 @@ interface DragState {
 
           <!-- Decorations -->
           @for (deco of design().decorations; track deco.id) {
-            <g 
+            <g
               class="hover:cursor-move hover:opacity-80 decoration-item"
               (mousedown)="startDrag($event, 'decoration', deco.id)"
               [style.transform]="'translate(' + deco.x + 'px, ' + deco.y + 'px) rotate(' + (deco.rotation || 0) + 'deg) scale(' + (deco.size/20) + ')'"
             >
                @if (deco.type === 'image' && deco.customImage) {
-                  <image 
-                    [attr.href]="deco.customImage" 
+                  <image
+                    [attr.href]="deco.customImage"
+                    [attr.xlink:href]="deco.customImage"
                     x="-10" y="-10" width="20" height="20"
                   />
                } @else {
-                  <!-- Inline paths -->
-                  @if (deco.type === 'star') {
-                    <polygon points="0,-10 2.2,-3.2 9.5,-3.2 3.6,1.1 5.9,7.8 0,3.6 -5.9,7.8 -3.6,1.1 -9.5,-3.2 -2.2,-3.2" [attr.fill]="deco.color || design().textColor"/>
-                  }
-                  @if (deco.type === 'crown') {
-                    <path d="M-10,5 L-10,-5 L-6,-2 L0,-8 L6,-2 L10,-5 L10,5 Z" [attr.fill]="deco.color || design().textColor"/>
-                  }
-                  @if (deco.type === 'check-mark') {
-                     <path d="M-8 0 L-2 6 L8 -6" fill="none" [attr.stroke]="deco.color || design().textColor" stroke-width="3" stroke-linecap="round"/>
+                  @switch (deco.type) {
+                    @case ('star') {
+                      <polygon points="0,-10 2.2,-3.2 9.5,-3.2 3.6,1.1 5.9,7.8 0,3.6 -5.9,7.8 -3.6,1.1 -9.5,-3.2 -2.2,-3.2" [attr.fill]="deco.color || design().textColor"/>
+                    }
+                    @case ('heart') {
+                      <path d="M0,8 C-8,2 -10,-3 -7,-7 C-4,-10 -1,-8 0,-5 C1,-8 4,-10 7,-7 C10,-3 8,2 0,8 Z" [attr.fill]="deco.color || design().textColor"/>
+                    }
+                    @case ('crown') {
+                      <path d="M-10,5 L-10,-5 L-6,-2 L0,-8 L6,-2 L10,-5 L10,5 Z" [attr.fill]="deco.color || design().textColor"/>
+                    }
+                    @case ('check-mark') {
+                      <path d="M-8 0 L-2 6 L8 -6" fill="none" [attr.stroke]="deco.color || design().textColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                    }
+                    @case ('laurel-wreath') {
+                      <g [attr.fill]="deco.color || design().textColor">
+                        <path d="M-9,-2 Q-11,-6 -8,-9 Q-5,-7 -7,-3 Z"/>
+                        <path d="M-9,2 Q-11,6 -8,9 Q-5,7 -7,3 Z"/>
+                        <path d="M-7,-7 Q-9,-10 -5,-11 Q-3,-9 -5,-7 Z"/>
+                        <path d="M-7,7 Q-9,10 -5,11 Q-3,9 -5,7 Z"/>
+                        <path d="M9,-2 Q11,-6 8,-9 Q5,-7 7,-3 Z"/>
+                        <path d="M9,2 Q11,6 8,9 Q5,7 7,3 Z"/>
+                        <path d="M7,-7 Q9,-10 5,-11 Q3,-9 5,-7 Z"/>
+                        <path d="M7,7 Q9,10 5,11 Q3,9 5,7 Z"/>
+                      </g>
+                    }
+                    @case ('ribbon-bow') {
+                      <g [attr.fill]="deco.color || design().textColor">
+                        <path d="M-2,-1 L-9,-6 L-9,6 L-2,1 Z"/>
+                        <path d="M2,-1 L9,-6 L9,6 L2,1 Z"/>
+                        <circle cx="0" cy="0" r="2.5"/>
+                      </g>
+                    }
+                    @case ('wing') {
+                      <g [attr.fill]="deco.color || design().textColor">
+                        <path d="M-2,0 Q-8,-2 -10,2 Q-6,3 -2,2 Z"/>
+                        <path d="M-2,0 Q-7,-4 -9,-1 Q-5,0 -2,-1 Z"/>
+                        <path d="M2,0 Q8,-2 10,2 Q6,3 2,2 Z"/>
+                        <path d="M2,0 Q7,-4 9,-1 Q5,0 2,-1 Z"/>
+                      </g>
+                    }
+                    @case ('sparkles') {
+                      <g [attr.fill]="deco.color || design().textColor">
+                        <path d="M0,-9 L1,-1 L9,0 L1,1 L0,9 L-1,1 L-9,0 L-1,-1 Z"/>
+                        <path d="M-7,-7 L-6,-5 L-4,-4 L-6,-3 L-7,-1 L-8,-3 L-10,-4 L-8,-5 Z" transform="scale(0.4) translate(-12,-12)"/>
+                        <path d="M7,7 L8,9 L10,10 L8,11 L7,13 L6,11 L4,10 L6,9 Z" transform="scale(0.4) translate(12,12)"/>
+                      </g>
+                    }
+                    @case ('trophy') {
+                      <g [attr.fill]="deco.color || design().textColor">
+                        <path d="M-6,-8 L6,-8 L5,2 Q5,5 0,5 Q-5,5 -5,2 Z"/>
+                        <rect x="-2" y="5" width="4" height="3"/>
+                        <rect x="-5" y="8" width="10" height="2" rx="1"/>
+                        <path d="M-6,-6 Q-9,-6 -9,-3 Q-9,-1 -6,-1" fill="none" [attr.stroke]="deco.color || design().textColor" stroke-width="1.5"/>
+                        <path d="M6,-6 Q9,-6 9,-3 Q9,-1 6,-1" fill="none" [attr.stroke]="deco.color || design().textColor" stroke-width="1.5"/>
+                      </g>
+                    }
+                    @case ('medal') {
+                      <g>
+                        <path d="M-5,-9 L-3,-3 L0,-5 L3,-3 L5,-9" fill="none" [attr.stroke]="deco.color || design().textColor" stroke-width="2"/>
+                        <circle cx="0" cy="3" r="6" [attr.fill]="deco.color || design().textColor"/>
+                        <circle cx="0" cy="3" r="3" fill="none" stroke="rgba(0,0,0,0.25)" stroke-width="0.8"/>
+                      </g>
+                    }
                   }
                }
             </g>
@@ -163,9 +218,10 @@ interface DragState {
             [style.transform]="'translate(' + (design().iconSettings?.x || 100) + 'px, ' + (design().iconSettings?.y || 85) + 'px)'"
           >
             @if (design().customLogo) {
-              <image 
-                [attr.href]="design().customLogo" 
-                [attr.width]="design().iconSettings?.size || 40" 
+              <image
+                [attr.href]="design().customLogo"
+                [attr.xlink:href]="design().customLogo"
+                [attr.width]="design().iconSettings?.size || 40"
                 [attr.height]="design().iconSettings?.size || 40"
                 [attr.x]="-(design().iconSettings?.size || 40)/2"
                 [attr.y]="-(design().iconSettings?.size || 40)/2"
