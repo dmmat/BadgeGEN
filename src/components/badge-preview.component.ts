@@ -1,5 +1,4 @@
-import { Component, input, ElementRef, viewChild, inject, signal, effect } from '@angular/core';
-import { BadgeDesign, LayoutSettings } from '../services/badge-types';
+import { Component, ElementRef, HostListener, viewChild, inject, signal, computed, effect } from '@angular/core';
 import { BadgeStore } from '../services/badge.store';
 
 type DraggableType = 'title' | 'subtitle' | 'accent' | 'icon' | 'decoration' | 'extraText';
@@ -7,20 +6,26 @@ type DraggableType = 'title' | 'subtitle' | 'accent' | 'icon' | 'decoration' | '
 interface DragState {
   type: DraggableType;
   id?: string; // For decorations/extraText
+  pointerId: number;
   startX: number;
   startY: number;
   elementStartX: number;
   elementStartY: number;
 }
 
+interface Selection {
+  type: DraggableType;
+  id?: string;
+}
+
 @Component({
   selector: 'app-badge-preview',
   template: `
-    <div 
+    <div
       class="relative w-full max-w-[880px] mx-auto flex flex-col items-center p-6 bg-white rounded-xl shadow-sm border border-gray-100"
-      (mousemove)="onMouseMove($event)"
-      (mouseup)="onMouseUp()"
-      (mouseleave)="onMouseUp()"
+      (pointermove)="onPointerMove($event)"
+      (pointerup)="onPointerUp($event)"
+      (pointercancel)="onPointerUp($event)"
     >
       <div class="w-full flex items-center justify-between mb-4 text-xs">
         <span class="uppercase tracking-wide text-gray-400">Live Preview</span>
@@ -30,7 +35,7 @@ interface DragState {
           <button (click)="confirmReset()" class="px-3 py-1 rounded-md border border-gray-200 bg-white text-gray-600 font-semibold hover:bg-red-50 hover:text-red-600 hover:border-red-200" title="Reset to default badge">↺ Reset</button>
         </div>
       </div>
-      <div #captureContainer class="w-full aspect-square max-w-[700px] flex items-center justify-center relative select-none">
+      <div #captureContainer class="w-full aspect-square max-w-[700px] flex items-center justify-center relative select-none" (pointerdown)="clearSelection()">
         
         <!-- SVG Canvas -->
         <svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-xl cursor-default" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
@@ -133,7 +138,7 @@ interface DragState {
           @for (deco of design().decorations; track deco.id) {
             <g
               class="hover:cursor-move hover:opacity-80 decoration-item"
-              (mousedown)="startDrag($event, 'decoration', deco.id)"
+              (pointerdown)="startDrag($event, 'decoration', deco.id)"
               [style.transform]="'translate(' + deco.x + 'px, ' + deco.y + 'px) rotate(' + (deco.rotation || 0) + 'deg) scale(' + (deco.size/20) + ')'"
             >
                @if (deco.type === 'image' && deco.customImage) {
@@ -215,7 +220,7 @@ interface DragState {
           <!-- Icon / Logo -->
           <g 
             class="hover:cursor-move hover:opacity-80 transition-opacity"
-            (mousedown)="startDrag($event, 'icon')"
+            (pointerdown)="startDrag($event, 'icon')"
             [style.transform]="'translate(' + (design().iconSettings?.x || 100) + 'px, ' + (design().iconSettings?.y || 85) + 'px)'"
           >
             @if (design().customLogo) {
@@ -253,7 +258,7 @@ interface DragState {
             [attr.fill]="design().textColor" 
             [attr.filter]="design().titleSettings?.hasShadow ? 'url(#shadow)' : 'none'"
             class="hover:cursor-move hover:fill-opacity-80 select-none badge-text"
-            (mousedown)="startDrag($event, 'title')"
+            (pointerdown)="startDrag($event, 'title')"
           >
             {{ design().title }}
           </text>
@@ -271,7 +276,7 @@ interface DragState {
             [attr.filter]="design().subtitleSettings?.hasShadow ? 'url(#shadow)' : 'none'"
             opacity="0.9"
             class="hover:cursor-move hover:fill-opacity-80 select-none badge-text"
-            (mousedown)="startDrag($event, 'subtitle')"
+            (pointerdown)="startDrag($event, 'subtitle')"
           >
             {{ design().subtitle }}
           </text>
@@ -289,7 +294,7 @@ interface DragState {
              [attr.fill]="design().textColor"
              [attr.filter]="design().accentSettings?.hasShadow ? 'url(#shadow)' : 'none'"
              class="hover:cursor-move hover:fill-opacity-80 select-none badge-text"
-             (mousedown)="startDrag($event, 'accent')"
+             (pointerdown)="startDrag($event, 'accent')"
           >
              {{ design().accentText }}
           </text>
@@ -308,7 +313,7 @@ interface DragState {
                [attr.fill]="txt.color" 
                [attr.filter]="txt.hasShadow ? 'url(#shadow)' : 'none'"
                class="hover:cursor-move hover:fill-opacity-80 select-none badge-text"
-               (mousedown)="startDrag($event, 'extraText', txt.id)"
+               (pointerdown)="startDrag($event, 'extraText', txt.id)"
              >
                {{ txt.text }}
              </text>
@@ -316,10 +321,18 @@ interface DragState {
           
           <!-- Snapping Guides -->
           @if (isDragging()) {
-             <line x1="100" y1="0" x2="100" y2="200" stroke="#3B82F6" stroke-width="0.5" stroke-dasharray="4 2" 
+             <line x1="100" y1="0" x2="100" y2="200" stroke="#3B82F6" stroke-width="0.5" stroke-dasharray="4 2"
                 [class.opacity-0]="!snappedX()" [class.opacity-100]="snappedX()" />
              <line x1="0" y1="100" x2="200" y2="100" stroke="#3B82F6" stroke-width="0.5" stroke-dasharray="4 2"
                 [class.opacity-0]="!snappedY()" [class.opacity-100]="snappedY()" />
+          }
+
+          <!-- Selection Indicator -->
+          @if (selectionAnchor(); as anchor) {
+             <g style="pointer-events: none;">
+                <circle [attr.cx]="anchor.x" [attr.cy]="anchor.y" r="14" fill="none" stroke="#3B82F6" stroke-width="0.8" stroke-dasharray="3 2" opacity="0.9"/>
+                <circle [attr.cx]="anchor.x" [attr.cy]="anchor.y" r="1.5" fill="#3B82F6"/>
+             </g>
           }
         </svg>
       </div>
@@ -369,62 +382,49 @@ export class BadgePreviewComponent {
   snappedX = signal(false);
   snappedY = signal(false);
 
-  startDrag(event: MouseEvent, type: DraggableType, id?: string) {
+  // Selection state for keyboard nudging and visual indicator
+  selection = signal<Selection | null>(null);
+  readonly selectionAnchor = computed(() => this.resolveAnchor(this.selection()));
+
+  startDrag(event: PointerEvent, type: DraggableType, id?: string) {
     event.preventDefault();
     event.stopPropagation();
-    
-    // Initial Position Lookup
-    let startX = 0;
-    let startY = 0;
 
-    if (type === 'decoration' && id) {
-      const deco = this.design().decorations.find(d => d.id === id);
-      if (deco) {
-        startX = deco.x;
-        startY = deco.y;
-      }
-    } else if (type === 'extraText' && id) {
-      const txt = this.design().extraTexts.find(t => t.id === id);
-      if (txt) {
-        startX = txt.x;
-        startY = txt.y;
-      }
-    } else if (type !== 'decoration' && type !== 'extraText') {
-      const settings = this.design()[`${type}Settings` as const];
-      if (settings) {
-        startX = settings.x;
-        startY = settings.y;
-      }
-    }
+    const start = this.resolveAnchor({ type, id });
+    if (!start) return;
 
     this.dragState = {
       type,
       id,
+      pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      elementStartX: startX,
-      elementStartY: startY
+      elementStartX: start.x,
+      elementStartY: start.y
     };
     this.isDragging.set(true);
+    this.selection.set({ type, id });
+
+    const target = event.currentTarget as Element | null;
+    target?.setPointerCapture?.(event.pointerId);
   }
 
-  onMouseMove(event: MouseEvent) {
-    if (!this.dragState) return;
-    
+  onPointerMove(event: PointerEvent) {
+    if (!this.dragState || event.pointerId !== this.dragState.pointerId) return;
+
     const svgRect = this.captureContainer()?.nativeElement.getBoundingClientRect();
     if (!svgRect) return;
-    
+
     const scaleFactor = 200 / svgRect.width;
     const dx = (event.clientX - this.dragState.startX) * scaleFactor;
     const dy = (event.clientY - this.dragState.startY) * scaleFactor;
-    
+
     let newX = this.dragState.elementStartX + dx;
     let newY = this.dragState.elementStartY + dy;
 
-    // Snapping Logic
     const SNAP_THRESHOLD = 3;
     const CENTER = 100;
-    
+
     if (Math.abs(newX - CENTER) < SNAP_THRESHOLD) {
       newX = CENTER;
       this.snappedX.set(true);
@@ -439,17 +439,14 @@ export class BadgePreviewComponent {
       this.snappedY.set(false);
     }
 
-    // Update Store
-    if (this.dragState.type === 'decoration' && this.dragState.id) {
-       this.store.updateDecoration(this.dragState.id, { x: newX, y: newY });
-    } else if (this.dragState.type === 'extraText' && this.dragState.id) {
-       this.store.updateExtraText(this.dragState.id, { x: newX, y: newY });
-    } else if (this.dragState.type !== 'decoration' && this.dragState.type !== 'extraText') {
-       this.store.updateElement(this.dragState.type as any, { x: newX, y: newY });
-    }
+    this.applyPosition(this.dragState.type, this.dragState.id, newX, newY);
   }
 
-  onMouseUp() {
+  onPointerUp(event: PointerEvent) {
+    if (this.dragState && event.pointerId === this.dragState.pointerId) {
+      const target = event.currentTarget as Element | null;
+      target?.releasePointerCapture?.(event.pointerId);
+    }
     this.dragState = null;
     this.isDragging.set(false);
     this.snappedX.set(false);
@@ -459,6 +456,93 @@ export class BadgePreviewComponent {
   confirmReset() {
     if (window.confirm('Reset the badge to defaults? This clears history.')) {
       this.store.reset();
+      this.selection.set(null);
+    }
+  }
+
+  clearSelection() {
+    this.selection.set(null);
+  }
+
+  @HostListener('window:keydown', ['$event'])
+  onKeyDown(event: KeyboardEvent) {
+    const target = event.target as HTMLElement | null;
+    const tag = target?.tagName;
+    const isEditable = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable;
+
+    const mod = event.metaKey || event.ctrlKey;
+    if (mod && !event.shiftKey && event.key.toLowerCase() === 'z') {
+      event.preventDefault();
+      this.store.undo();
+      return;
+    }
+    if (mod && (event.shiftKey && event.key.toLowerCase() === 'z' || event.key.toLowerCase() === 'y')) {
+      event.preventDefault();
+      this.store.redo();
+      return;
+    }
+
+    if (isEditable) return;
+
+    const sel = this.selection();
+    if (!sel) return;
+
+    if (event.key === 'Escape') {
+      this.selection.set(null);
+      return;
+    }
+
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      if (sel.type === 'decoration' && sel.id) {
+        event.preventDefault();
+        this.store.removeDecoration(sel.id);
+        this.selection.set(null);
+        return;
+      }
+      if (sel.type === 'extraText' && sel.id) {
+        event.preventDefault();
+        this.store.removeExtraText(sel.id);
+        this.selection.set(null);
+        return;
+      }
+    }
+
+    const nudges: Record<string, [number, number]> = {
+      ArrowUp: [0, -1],
+      ArrowDown: [0, 1],
+      ArrowLeft: [-1, 0],
+      ArrowRight: [1, 0]
+    };
+    const delta = nudges[event.key];
+    if (!delta) return;
+    event.preventDefault();
+    const step = event.shiftKey ? 10 : 1;
+    const anchor = this.resolveAnchor(sel);
+    if (!anchor) return;
+    this.applyPosition(sel.type, sel.id, anchor.x + delta[0] * step, anchor.y + delta[1] * step);
+  }
+
+  private resolveAnchor(sel: Selection | null): { x: number; y: number } | null {
+    if (!sel) return null;
+    if (sel.type === 'decoration' && sel.id) {
+      const deco = this.design().decorations.find(d => d.id === sel.id);
+      return deco ? { x: deco.x, y: deco.y } : null;
+    }
+    if (sel.type === 'extraText' && sel.id) {
+      const txt = this.design().extraTexts.find(t => t.id === sel.id);
+      return txt ? { x: txt.x, y: txt.y } : null;
+    }
+    const settings = this.design()[`${sel.type}Settings` as const];
+    return settings ? { x: settings.x, y: settings.y } : null;
+  }
+
+  private applyPosition(type: DraggableType, id: string | undefined, x: number, y: number) {
+    if (type === 'decoration' && id) {
+      this.store.updateDecoration(id, { x, y });
+    } else if (type === 'extraText' && id) {
+      this.store.updateExtraText(id, { x, y });
+    } else if (type !== 'decoration' && type !== 'extraText') {
+      this.store.updateElement(type, { x, y });
     }
   }
 
