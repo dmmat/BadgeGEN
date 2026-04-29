@@ -209,6 +209,17 @@ export class BadgeStore {
     this.state.set(createDefaultBadge());
   }
 
+  applyTemplate(template: Partial<BadgeDesign>) {
+    // Drop element-collections from previous design so a template starts clean
+    const merged: BadgeDesign = {
+      ...createDefaultBadge(),
+      ...template,
+      decorations: template.decorations ?? [],
+      extraTexts: template.extraTexts ?? []
+    };
+    this.commit(merged);
+  }
+
   undo() {
     if (this.undoStack.length === 0) return;
     const previous = this.undoStack.pop()!;
