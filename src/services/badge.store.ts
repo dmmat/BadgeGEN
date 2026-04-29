@@ -160,22 +160,42 @@ export class BadgeStore {
     });
   }
 
-  // Sharing
+  // Sharing — UTF-safe base64url
   serializeState(): string {
     const json = JSON.stringify(this.state());
-    return btoa(encodeURIComponent(json));
+    const bytes = new TextEncoder().encode(json);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
 
-  loadState(encoded: string) {
+  loadState(encoded: string): boolean {
     try {
-      const json = decodeURIComponent(atob(encoded));
+      // Accept both legacy (encodeURIComponent + btoa) and new base64url payloads
+      const padded = encoded.replace(/-/g, '+').replace(/_/g, '/');
+      const padding = padded.length % 4 === 0 ? 0 : 4 - (padded.length % 4);
+      const base64 = padded + '='.repeat(padding);
+      const binary = atob(base64);
+      let json: string;
+      try {
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        json = new TextDecoder().decode(bytes);
+        JSON.parse(json);
+      } catch {
+        json = decodeURIComponent(binary);
+      }
       const design = JSON.parse(json) as BadgeDesign;
       this.state.set({ ...createDefaultBadge(), ...design });
       this.undoStack = [];
       this.redoStack = [];
       this.syncHistorySignals();
+      return true;
     } catch (e) {
       console.error('Failed to load shared state', e);
+      return false;
     }
   }
 
