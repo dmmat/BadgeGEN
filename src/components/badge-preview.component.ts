@@ -33,11 +33,14 @@ interface Selection {
       (pointercancel)="onPointerUp($event)"
     >
       <div class="w-full flex items-center justify-between mb-4 text-xs">
-        <span class="uppercase tracking-wide text-gray-400">Live Preview</span>
+        <span class="uppercase tracking-wide text-gray-400 flex items-center gap-2">
+          Live Preview
+          <span class="text-gray-300" title="Ctrl/Cmd+Z undo · Shift+Z redo · Arrow keys nudge · Shift+Arrow ×10 · Delete removes selection · Esc deselects" aria-label="Keyboard shortcuts">⌨</span>
+        </span>
         <div class="flex gap-2">
-          <button (click)="store.undo()" [disabled]="!store.canUndo()" class="px-3 py-1 rounded-md border border-gray-200 bg-white text-gray-700 font-semibold disabled:opacity-40" title="Undo (Ctrl+Z)">↶ Undo</button>
-          <button (click)="store.redo()" [disabled]="!store.canRedo()" class="px-3 py-1 rounded-md border border-gray-200 bg-white text-gray-700 font-semibold disabled:opacity-40" title="Redo (Ctrl+Shift+Z)">↷ Redo</button>
-          <button (click)="confirmReset()" class="px-3 py-1 rounded-md border border-gray-200 bg-white text-gray-600 font-semibold hover:bg-red-50 hover:text-red-600 hover:border-red-200" title="Reset to default badge">↺ Reset</button>
+          <button (click)="store.undo()" [disabled]="!store.canUndo()" class="px-3 py-1 rounded-md border border-gray-200 bg-white text-gray-700 font-semibold disabled:opacity-40" title="Undo (Ctrl+Z)" aria-label="Undo">↶ Undo</button>
+          <button (click)="store.redo()" [disabled]="!store.canRedo()" class="px-3 py-1 rounded-md border border-gray-200 bg-white text-gray-700 font-semibold disabled:opacity-40" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷ Redo</button>
+          <button (click)="confirmReset()" class="px-3 py-1 rounded-md border border-gray-200 bg-white text-gray-600 font-semibold hover:bg-red-50 hover:text-red-600 hover:border-red-200" title="Reset to default badge" aria-label="Reset design">↺ Reset</button>
         </div>
       </div>
       <div #captureContainer class="w-full aspect-square max-w-[700px] flex items-center justify-center relative select-none" (pointerdown)="clearSelection()">
