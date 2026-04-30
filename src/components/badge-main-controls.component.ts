@@ -2,19 +2,15 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { BadgeStore } from '../services/badge.store';
 import { BadgeDesign } from '../services/badge-types';
-import { BadgeTemplatesComponent } from './badge-templates.component';
 
 @Component({
   selector: 'app-badge-main-controls',
   standalone: true,
-  imports: [FormsModule, BadgeTemplatesComponent],
+  imports: [FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-4">
-      <app-badge-templates />
-      <div class="border-t border-gray-100 pt-3">
-        <p class="text-[11px] uppercase tracking-wide text-gray-400">Layout & Styling</p>
-      </div>
+      <p class="text-[11px] uppercase tracking-wide text-gray-400">Layout & Styling</p>
 
       <!-- Shape Selection -->
       <div>
