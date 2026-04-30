@@ -207,11 +207,19 @@ interface Selection {
 
           <!-- Interactive Elements -->
           <!-- Icon / Logo -->
-          <g 
+          <g
             class="hover:cursor-move hover:opacity-80 transition-opacity"
             (pointerdown)="startDrag($event, 'icon')"
             [style.transform]="'translate(' + (design().iconSettings?.x || 100) + 'px, ' + (design().iconSettings?.y || 85) + 'px)'"
           >
+            <!-- Invisible hit area so blank pixels around the emoji are still draggable -->
+            <rect
+              [attr.x]="-(design().iconSettings?.size || 40)/2"
+              [attr.y]="-(design().iconSettings?.size || 40)/2"
+              [attr.width]="design().iconSettings?.size || 40"
+              [attr.height]="design().iconSettings?.size || 40"
+              fill="transparent"
+            />
             @if (design().customLogo) {
               <image
                 [attr.href]="design().customLogo"
@@ -222,12 +230,11 @@ interface Selection {
                 [attr.y]="-(design().iconSettings?.size || 40)/2"
               />
             } @else {
-              <text 
-                text-anchor="middle" 
+              <text
+                text-anchor="middle"
                 alignment-baseline="middle"
-                [attr.font-size]="design().iconSettings?.size || 40" 
+                [attr.font-size]="design().iconSettings?.size || 40"
                 filter="url(#shadow)"
-                style="pointer-events: none;"
                 [attr.fill]="design().iconStyle === 'mono' ? design().iconColor : undefined"
               >
                 {{ design().emoji }}
