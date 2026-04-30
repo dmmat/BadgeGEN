@@ -18,6 +18,16 @@ interface DragState {
   elementStartY: number;
 }
 
+interface RotateState {
+  type: DraggableType;
+  id?: string;
+  pointerId: number;
+  anchorClientX: number;
+  anchorClientY: number;
+  startScreenAngleDeg: number;
+  startRotation: number;
+}
+
 interface Selection {
   type: DraggableType;
   id?: string;
@@ -325,9 +335,28 @@ interface Selection {
 
           <!-- Selection Indicator -->
           @if (selectionAnchor(); as anchor) {
-             <g data-export-skip="true" style="pointer-events: none;">
-                <circle [attr.cx]="anchor.x" [attr.cy]="anchor.y" r="14" fill="none" stroke="#3B82F6" stroke-width="0.8" stroke-dasharray="3 2" opacity="0.9"/>
-                <circle [attr.cx]="anchor.x" [attr.cy]="anchor.y" r="1.5" fill="#3B82F6"/>
+             <g data-export-skip="true">
+                <g style="pointer-events: none;">
+                   <circle [attr.cx]="anchor.x" [attr.cy]="anchor.y" r="14" fill="none" stroke="#3B82F6" stroke-width="0.8" stroke-dasharray="3 2" opacity="0.9"/>
+                   <circle [attr.cx]="anchor.x" [attr.cy]="anchor.y" r="1.5" fill="#3B82F6"/>
+                </g>
+                @if (selectionRotation() !== null) {
+                   <g [attr.transform]="'rotate(' + (selectionRotation() ?? 0) + ' ' + anchor.x + ' ' + anchor.y + ')'">
+                      <line style="pointer-events: none;" [attr.x1]="anchor.x" [attr.y1]="anchor.y - 14" [attr.x2]="anchor.x" [attr.y2]="anchor.y - 20" stroke="#3B82F6" stroke-width="0.8" opacity="0.9"/>
+                      <circle
+                        [attr.cx]="anchor.x"
+                        [attr.cy]="anchor.y - 22"
+                        r="2.5"
+                        fill="#3B82F6"
+                        stroke="#FFFFFF"
+                        stroke-width="0.6"
+                        class="cursor-grab"
+                        role="button"
+                        aria-label="Rotate selection"
+                        (pointerdown)="startRotate($event)"
+                      />
+                   </g>
+                }
              </g>
           }
         </svg>
@@ -405,6 +434,19 @@ export class BadgePreviewComponent {
   // Selection state for keyboard nudging and visual indicator
   selection = signal<Selection | null>(null);
   readonly selectionAnchor = computed(() => this.resolveAnchor(this.selection()));
+  readonly selectionRotation = computed<number | null>(() => {
+    const sel = this.selection();
+    if (!sel) return null;
+    if (sel.type === 'decoration' && sel.id) {
+      return this.design().decorations.find(d => d.id === sel.id)?.rotation ?? 0;
+    }
+    if (sel.type === 'extraText' && sel.id) {
+      return this.design().extraTexts.find(t => t.id === sel.id)?.rotation ?? 0;
+    }
+    return null;
+  });
+
+  private rotateState: RotateState | null = null;
 
   startDrag(event: PointerEvent, type: DraggableType, id?: string) {
     event.preventDefault();
@@ -429,7 +471,56 @@ export class BadgePreviewComponent {
     target?.setPointerCapture?.(event.pointerId);
   }
 
+  startRotate(event: PointerEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const sel = this.selection();
+    if (!sel) return;
+    const anchor = this.resolveAnchor(sel);
+    if (!anchor) return;
+    const currentRotation = this.selectionRotation();
+    if (currentRotation === null) return;
+
+    const svgRect = this.captureContainer()?.nativeElement.getBoundingClientRect();
+    if (!svgRect) return;
+
+    const scale = svgRect.width / VIEWBOX;
+    const anchorClientX = svgRect.left + anchor.x * scale;
+    const anchorClientY = svgRect.top + anchor.y * scale;
+
+    const dxStart = event.clientX - anchorClientX;
+    const dyStart = event.clientY - anchorClientY;
+    // Handle sits at the top, so '0 deg' = pointer above anchor (-Y direction).
+    // atan2 returns 0 along +X, so add 90° to make 'up' = 0.
+    const startScreenAngleDeg = (Math.atan2(dyStart, dxStart) * 180) / Math.PI + 90;
+
+    this.rotateState = {
+      type: sel.type,
+      id: sel.id,
+      pointerId: event.pointerId,
+      anchorClientX,
+      anchorClientY,
+      startScreenAngleDeg,
+      startRotation: currentRotation
+    };
+
+    const target = event.currentTarget as Element | null;
+    target?.setPointerCapture?.(event.pointerId);
+  }
+
   onPointerMove(event: PointerEvent) {
+    if (this.rotateState && event.pointerId === this.rotateState.pointerId) {
+      const dx = event.clientX - this.rotateState.anchorClientX;
+      const dy = event.clientY - this.rotateState.anchorClientY;
+      const screenAngleDeg = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
+      let rotation = this.rotateState.startRotation + (screenAngleDeg - this.rotateState.startScreenAngleDeg);
+      if (event.shiftKey) rotation = Math.round(rotation / 15) * 15;
+      rotation = ((rotation % 360) + 360) % 360;
+      this.applyRotation(this.rotateState.type, this.rotateState.id, rotation);
+      return;
+    }
+
     if (!this.dragState || event.pointerId !== this.dragState.pointerId) return;
 
     const svgRect = this.captureContainer()?.nativeElement.getBoundingClientRect();
@@ -466,10 +557,23 @@ export class BadgePreviewComponent {
       const target = event.currentTarget as Element | null;
       target?.releasePointerCapture?.(event.pointerId);
     }
+    if (this.rotateState && event.pointerId === this.rotateState.pointerId) {
+      const target = event.currentTarget as Element | null;
+      target?.releasePointerCapture?.(event.pointerId);
+      this.rotateState = null;
+    }
     this.dragState = null;
     this.isDragging.set(false);
     this.snappedX.set(false);
     this.snappedY.set(false);
+  }
+
+  private applyRotation(type: DraggableType, id: string | undefined, rotation: number) {
+    if (type === 'decoration' && id) {
+      this.store.updateDecoration(id, { rotation });
+    } else if (type === 'extraText' && id) {
+      this.store.updateExtraText(id, { rotation });
+    }
   }
 
   confirmReset() {
