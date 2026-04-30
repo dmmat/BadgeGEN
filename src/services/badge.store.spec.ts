@@ -172,6 +172,23 @@ describe('BadgeStore', () => {
     });
   });
 
+  describe('setShape / fitLayoutToShape', () => {
+    it('setShape applies the matching per-shape layout', () => {
+      store.setShape('ribbon');
+      // Ribbon's preset puts the title up top to clear the bottom notch
+      expect(store.state().shape).toBe('ribbon');
+      expect(store.state().titleSettings!.y).toBeLessThan(100);
+    });
+
+    it('fitLayoutToShape snaps positions back without changing the shape', () => {
+      store.setShape('shield');
+      store.update({ titleSettings: { ...store.state().titleSettings!, y: 200, x: 200 } });
+      store.fitLayoutToShape();
+      expect(store.state().titleSettings!.y).toBeLessThan(200);
+      expect(store.state().titleSettings!.x).toBe(100);
+    });
+  });
+
   describe('reset / template', () => {
     it('reset wipes history and restores defaults', () => {
       store.update({ title: 'Modified' });

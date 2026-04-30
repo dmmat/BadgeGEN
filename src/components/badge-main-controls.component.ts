@@ -52,12 +52,18 @@ import { BadgeTemplatesComponent } from './badge-templates.component';
         </div>
         <div class="mt-3 space-y-1">
           <label class="text-xs text-gray-500">Size: {{store.badge().shapeScale || 100}}%</label>
-          <input type="range" min="70" max="130" 
-            [ngModel]="store.badge().shapeScale || 100" 
+          <input type="range" min="70" max="130"
+            [ngModel]="store.badge().shapeScale || 100"
             (ngModelChange)="store.update({shapeScale: +$event})"
             class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+            aria-label="Shape scale"
           >
         </div>
+        <button
+          (click)="store.fitLayoutToShape()"
+          class="mt-2 w-full text-xs text-gray-600 border border-gray-200 rounded px-2 py-1 hover:bg-gray-50"
+          title="Snap title, subtitle, accent and icon back to the optimal positions for this shape"
+        >Fit layout to shape</button>
       </div>
 
       <!-- Theme Colors & Gradients -->
@@ -155,7 +161,7 @@ export class BadgeMainControlsComponent {
   ];
 
   updateShape(shape: BadgeDesign['shape']) {
-    this.store.update({ shape });
+    this.store.setShape(shape);
   }
 
   applyGradientPreset(preset: { primary: string, secondary: string }) {

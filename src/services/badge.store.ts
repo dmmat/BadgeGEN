@@ -1,5 +1,7 @@
 import { Injectable, signal, computed, effect } from '@angular/core';
 import { BadgeDesign, LayoutSettings, Decoration, ExtraText } from './badge-types';
+import { layoutFor } from './shape-layouts';
+import { ShapeName } from './shape-defs';
 
 const AUTOSAVE_KEY = 'badgegen:autosave:v1';
 
@@ -232,6 +234,33 @@ export class BadgeStore {
       extraTexts: template.extraTexts ?? []
     };
     this.commit(merged);
+  }
+
+  /**
+   * Switch shape and re-apply the matching layout. Each shape has a different
+   * inner area; reusing the previous layout often pushes the text out of the
+   * new shape, so we snap to a known-good preset and let the user customize.
+   */
+  setShape(shape: ShapeName) {
+    const layout = layoutFor(shape);
+    this.update({
+      shape,
+      titleSettings: layout.titleSettings,
+      subtitleSettings: layout.subtitleSettings,
+      accentSettings: layout.accentSettings,
+      iconSettings: layout.iconSettings
+    });
+  }
+
+  /** Snap title/subtitle/accent/icon positions to the current shape's preset. */
+  fitLayoutToShape() {
+    const layout = layoutFor(this.state().shape);
+    this.update({
+      titleSettings: { ...this.state().titleSettings!, ...layout.titleSettings },
+      subtitleSettings: { ...this.state().subtitleSettings!, ...layout.subtitleSettings },
+      accentSettings: { ...this.state().accentSettings!, ...layout.accentSettings },
+      iconSettings: { ...this.state().iconSettings!, ...layout.iconSettings }
+    });
   }
 
   undo() {
