@@ -1,5 +1,9 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, effect } from '@angular/core';
 import { BadgeDesign, LayoutSettings, Decoration, ExtraText } from './badge-types';
+import { layoutFor } from './shape-layouts';
+import { ShapeName } from './shape-defs';
+
+const AUTOSAVE_KEY = 'badgegen:autosave:v1';
 
 const DEFAULT_LAYOUT = {
   title: { x: 100, y: 120, size: 18, fontWeight: 'bold', fontStyle: 'normal', hasShadow: true } as LayoutSettings,
@@ -53,8 +57,25 @@ export class BadgeStore {
   readonly state = signal<BadgeDesign>(createDefaultBadge());
   private undoStack: BadgeDesign[] = [];
   private redoStack: BadgeDesign[] = [];
+  private readonly undoCount = signal(0);
+  private readonly redoCount = signal(0);
   private debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
   private debounceBaselines: Record<string, BadgeDesign | undefined> = {};
+  private autosaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private autosaveEnabled = false;
+
+  readonly canUndo = computed(() => this.undoCount() > 0);
+  readonly canRedo = computed(() => this.redoCount() > 0);
+
+  constructor() {
+    this.hydrateFromAutosave();
+    this.autosaveEnabled = true;
+    effect(() => {
+      const snapshot = this.state();
+      if (!this.autosaveEnabled) return;
+      this.scheduleAutosave(snapshot);
+    });
+  }
 
   // Actions
   update(partial: Partial<BadgeDesign>) {
@@ -155,21 +176,42 @@ export class BadgeStore {
     });
   }
 
-  // Sharing
+  // Sharing — UTF-safe base64url
   serializeState(): string {
     const json = JSON.stringify(this.state());
-    return btoa(encodeURIComponent(json));
+    const bytes = new TextEncoder().encode(json);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
 
-  loadState(encoded: string) {
+  loadState(encoded: string): boolean {
     try {
-      const json = decodeURIComponent(atob(encoded));
+      // Accept both legacy (encodeURIComponent + btoa) and new base64url payloads
+      const padded = encoded.replace(/-/g, '+').replace(/_/g, '/');
+      const padding = padded.length % 4 === 0 ? 0 : 4 - (padded.length % 4);
+      const base64 = padded + '='.repeat(padding);
+      const binary = atob(base64);
+      let json: string;
+      try {
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        json = new TextDecoder().decode(bytes);
+        JSON.parse(json);
+      } catch {
+        json = decodeURIComponent(binary);
+      }
       const design = JSON.parse(json) as BadgeDesign;
       this.state.set({ ...createDefaultBadge(), ...design });
       this.undoStack = [];
       this.redoStack = [];
+      this.syncHistorySignals();
+      return true;
     } catch (e) {
       console.error('Failed to load shared state', e);
+      return false;
     }
   }
 
@@ -179,7 +221,46 @@ export class BadgeStore {
   reset() {
     this.undoStack = [];
     this.redoStack = [];
+    this.syncHistorySignals();
     this.state.set(createDefaultBadge());
+  }
+
+  applyTemplate(template: Partial<BadgeDesign>) {
+    // Drop element-collections from previous design so a template starts clean
+    const merged: BadgeDesign = {
+      ...createDefaultBadge(),
+      ...template,
+      decorations: template.decorations ?? [],
+      extraTexts: template.extraTexts ?? []
+    };
+    this.commit(merged);
+  }
+
+  /**
+   * Switch shape and re-apply the matching layout. Each shape has a different
+   * inner area; reusing the previous layout often pushes the text out of the
+   * new shape, so we snap to a known-good preset and let the user customize.
+   */
+  setShape(shape: ShapeName) {
+    const layout = layoutFor(shape);
+    this.update({
+      shape,
+      titleSettings: layout.titleSettings,
+      subtitleSettings: layout.subtitleSettings,
+      accentSettings: layout.accentSettings,
+      iconSettings: layout.iconSettings
+    });
+  }
+
+  /** Snap title/subtitle/accent/icon positions to the current shape's preset. */
+  fitLayoutToShape() {
+    const layout = layoutFor(this.state().shape);
+    this.update({
+      titleSettings: { ...this.state().titleSettings!, ...layout.titleSettings },
+      subtitleSettings: { ...this.state().subtitleSettings!, ...layout.subtitleSettings },
+      accentSettings: { ...this.state().accentSettings!, ...layout.accentSettings },
+      iconSettings: { ...this.state().iconSettings!, ...layout.iconSettings }
+    });
   }
 
   undo() {
@@ -187,6 +268,7 @@ export class BadgeStore {
     const previous = this.undoStack.pop()!;
     const currentSnapshot = cloneDesign(this.state());
     this.redoStack.push(currentSnapshot);
+    this.syncHistorySignals();
     this.state.set(previous);
   }
 
@@ -195,15 +277,8 @@ export class BadgeStore {
     const next = this.redoStack.pop()!;
     const currentSnapshot = cloneDesign(this.state());
     this.undoStack.push(currentSnapshot);
+    this.syncHistorySignals();
     this.state.set(next);
-  }
-
-  canUndo() {
-    return this.undoStack.length > 0;
-  }
-
-  canRedo() {
-    return this.redoStack.length > 0;
   }
 
   private commit(newState: BadgeDesign) {
@@ -213,6 +288,7 @@ export class BadgeStore {
       this.undoStack.shift();
     }
     this.redoStack = [];
+    this.syncHistorySignals();
     this.state.set(cloneDesign(newState));
   }
 
@@ -236,13 +312,70 @@ export class BadgeStore {
       delete this.debounceTimers[key];
       delete this.debounceBaselines[key];
 
-      // Push baseline to undo history and apply final state
       this.undoStack.push(baseline);
       if (this.undoStack.length > MAX_UNDO_HISTORY) {
         this.undoStack.shift();
       }
       this.redoStack = [];
+      this.syncHistorySignals();
       this.state.set(cloneDesign(newState));
     }, ms);
+  }
+
+  private syncHistorySignals() {
+    this.undoCount.set(this.undoStack.length);
+    this.redoCount.set(this.redoStack.length);
+  }
+
+  // JSON export / import
+  exportJson(): string {
+    return JSON.stringify(this.state(), null, 2);
+  }
+
+  importJson(json: string): boolean {
+    try {
+      const parsed = JSON.parse(json) as Partial<BadgeDesign>;
+      const merged: BadgeDesign = {
+        ...createDefaultBadge(),
+        ...parsed,
+        decorations: parsed.decorations ?? [],
+        extraTexts: parsed.extraTexts ?? []
+      };
+      this.commit(merged);
+      return true;
+    } catch (e) {
+      console.error('Invalid badge JSON', e);
+      return false;
+    }
+  }
+
+  clearAutosave() {
+    try { localStorage.removeItem(AUTOSAVE_KEY); } catch {}
+  }
+
+  private scheduleAutosave(snapshot: BadgeDesign) {
+    if (typeof localStorage === 'undefined') return;
+    if (this.autosaveTimer) clearTimeout(this.autosaveTimer);
+    this.autosaveTimer = setTimeout(() => {
+      try {
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(snapshot));
+      } catch (e) {
+        console.warn('Autosave failed', e);
+      }
+    }, 500);
+  }
+
+  private hydrateFromAutosave() {
+    if (typeof localStorage === 'undefined') return;
+    // Skip hydration when a shared design is already present in the URL
+    if (typeof location !== 'undefined' && location.hash && location.hash.length > 1) return;
+    try {
+      const raw = localStorage.getItem(AUTOSAVE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<BadgeDesign>;
+      this.state.set({ ...createDefaultBadge(), ...parsed });
+    } catch (e) {
+      console.warn('Autosave restore failed', e);
+    }
   }
 }

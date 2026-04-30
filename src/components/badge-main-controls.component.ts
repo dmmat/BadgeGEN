@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { BadgeStore } from '../services/badge.store';
 import { BadgeDesign } from '../services/badge-types';
@@ -7,18 +7,17 @@ import { BadgeDesign } from '../services/badge-types';
   selector: 'app-badge-main-controls',
   standalone: true,
   imports: [FormsModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-4">
-      <div>
-        <p class="text-[11px] uppercase tracking-wide text-gray-400">Layout & Styling</p>
-      </div>
+      <p class="text-[11px] uppercase tracking-wide text-gray-400">Layout & Styling</p>
 
       <!-- Shape Selection -->
       <div>
         <label class="block text-xs font-medium text-gray-500 mb-2">Shape</label>
         <div class="grid grid-cols-5 gap-2">
           @for (shape of shapes; track shape) {
-            <button 
+            <button
               (click)="updateShape(shape)"
               class="aspect-square rounded-lg border-2 flex items-center justify-center hover:bg-gray-50 transition-all text-gray-600"
               [class.border-blue-500]="store.badge().shape === shape"
@@ -26,6 +25,8 @@ import { BadgeDesign } from '../services/badge-types';
               [class.text-blue-600]="store.badge().shape === shape"
               [class.border-gray-200]="store.badge().shape !== shape"
               [title]="shape"
+              [attr.aria-label]="'Shape: ' + shape"
+              [attr.aria-pressed]="store.badge().shape === shape"
             >
               @if(shape === 'circle') { <div class="w-8 h-8 rounded-full bg-current"></div> }
               @if(shape === 'shield') { <svg width="36" height="36" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"/></svg> }
@@ -47,12 +48,18 @@ import { BadgeDesign } from '../services/badge-types';
         </div>
         <div class="mt-3 space-y-1">
           <label class="text-xs text-gray-500">Size: {{store.badge().shapeScale || 100}}%</label>
-          <input type="range" min="70" max="130" 
-            [ngModel]="store.badge().shapeScale || 100" 
+          <input type="range" min="70" max="130"
+            [ngModel]="store.badge().shapeScale || 100"
             (ngModelChange)="store.update({shapeScale: +$event})"
             class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+            aria-label="Shape scale"
           >
         </div>
+        <button
+          (click)="store.fitLayoutToShape()"
+          class="mt-2 w-full text-xs text-gray-600 border border-gray-200 rounded px-2 py-1 hover:bg-gray-50"
+          title="Snap title, subtitle, accent and icon back to the optimal positions for this shape"
+        >Fit layout to shape</button>
       </div>
 
       <!-- Theme Colors & Gradients -->
@@ -60,45 +67,48 @@ import { BadgeDesign } from '../services/badge-types';
         <label class="block text-xs font-medium text-gray-500">Theme & Gradient</label>
         <div class="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
           @for (preset of gradientPresets; track preset.name) {
-            <button (click)="applyGradientPreset(preset)" 
+            <button (click)="applyGradientPreset(preset)"
               class="w-8 h-8 rounded-full border border-gray-200 flex-shrink-0"
               [style.background]="'linear-gradient(135deg, ' + preset.primary + ', ' + preset.secondary + ')'"
               [title]="preset.name"
+              [attr.aria-label]="'Apply gradient preset: ' + preset.name"
             ></button>
           }
         </div>
 
         <div class="grid grid-cols-2 gap-2">
-          <select 
-            [ngModel]="store.badge().gradientType" 
+          <select
+            [ngModel]="store.badge().gradientType"
             (ngModelChange)="store.update({gradientType: $event})"
             class="w-full text-xs rounded-md border-gray-300 shadow-sm focus:border-blue-500 px-2 py-1 bg-white text-gray-900"
+            aria-label="Gradient type"
           >
             <option value="linear">Linear</option>
             <option value="radial">Radial</option>
           </select>
-          <input type="number" 
-            [ngModel]="store.badge().gradientAngle" 
+          <input type="number"
+            [ngModel]="store.badge().gradientAngle"
             (ngModelChange)="store.update({gradientAngle: $event})"
             [disabled]="store.badge().gradientType === 'radial'"
             placeholder="Angle"
             class="w-full text-xs rounded-md border-gray-300 shadow-sm focus:border-blue-500 px-2 py-1 bg-white text-gray-900"
+            aria-label="Gradient angle in degrees"
           >
         </div>
 
         <div class="grid grid-cols-3 gap-2">
-          <div class="flex flex-col gap-1">
-            <input type="color" [ngModel]="store.badge().primaryColor" (ngModelChange)="store.update({primaryColor: $event})" class="h-8 w-full rounded cursor-pointer border border-gray-200 p-0 bg-white">
+          <label class="flex flex-col gap-1">
+            <input type="color" [ngModel]="store.badge().primaryColor" (ngModelChange)="store.update({primaryColor: $event})" class="h-8 w-full rounded cursor-pointer border border-gray-200 p-0 bg-white" aria-label="Gradient start color">
             <span class="text-[10px] text-gray-500 text-center">Start</span>
-          </div>
-          <div class="flex flex-col gap-1">
-            <input type="color" [ngModel]="store.badge().secondaryColor" (ngModelChange)="store.update({secondaryColor: $event})" class="h-8 w-full rounded cursor-pointer border border-gray-200 p-0 bg-white">
+          </label>
+          <label class="flex flex-col gap-1">
+            <input type="color" [ngModel]="store.badge().secondaryColor" (ngModelChange)="store.update({secondaryColor: $event})" class="h-8 w-full rounded cursor-pointer border border-gray-200 p-0 bg-white" aria-label="Gradient end color">
             <span class="text-[10px] text-gray-500 text-center">End</span>
-          </div>
-          <div class="flex flex-col gap-1">
-            <input type="color" [ngModel]="store.badge().textColor" (ngModelChange)="store.update({textColor: $event})" class="h-8 w-full rounded cursor-pointer border border-gray-200 p-0 bg-white">
+          </label>
+          <label class="flex flex-col gap-1">
+            <input type="color" [ngModel]="store.badge().textColor" (ngModelChange)="store.update({textColor: $event})" class="h-8 w-full rounded cursor-pointer border border-gray-200 p-0 bg-white" aria-label="Text color">
             <span class="text-[10px] text-gray-500 text-center">Text</span>
-          </div>
+          </label>
         </div>
       </div>
 
@@ -106,14 +116,14 @@ import { BadgeDesign } from '../services/badge-types';
       <div class="space-y-3 pt-3 border-t border-gray-100">
         <label class="block text-xs font-medium text-gray-500">Border & Shadow</label>
         <div class="grid grid-cols-2 gap-4">
-          <div class="space-y-1">
-            <label class="text-xs text-gray-500">Width: {{store.badge().borderWidth}}px</label>
-            <input type="range" min="0" max="15" [ngModel]="store.badge().borderWidth" (ngModelChange)="store.update({borderWidth: +$event})" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
-          </div>
-          <div class="flex flex-col gap-1">
-            <label class="text-xs text-gray-500">Color</label>
-            <input type="color" [ngModel]="store.badge().borderColor" (ngModelChange)="store.update({borderColor: $event})" class="h-8 w-full rounded cursor-pointer border border-gray-200 p-0 bg-white">
-          </div>
+          <label class="space-y-1 block">
+            <span class="text-xs text-gray-500">Width: {{store.badge().borderWidth}}px</span>
+            <input type="range" min="0" max="15" [ngModel]="store.badge().borderWidth" (ngModelChange)="store.update({borderWidth: +$event})" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" aria-label="Border width">
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-gray-500">Color</span>
+            <input type="color" [ngModel]="store.badge().borderColor" (ngModelChange)="store.update({borderColor: $event})" class="h-8 w-full rounded cursor-pointer border border-gray-200 p-0 bg-white" aria-label="Border color">
+          </label>
         </div>
         <div class="flex items-center gap-2">
           <input type="checkbox" id="shadowToggle" class="h-8 w-8 rounded border-gray-300 text-blue-600 focus:ring-blue-500" [ngModel]="store.badge().hasShadow" (ngModelChange)="store.update({hasShadow: $event})">
@@ -147,7 +157,7 @@ export class BadgeMainControlsComponent {
   ];
 
   updateShape(shape: BadgeDesign['shape']) {
-    this.store.update({ shape });
+    this.store.setShape(shape);
   }
 
   applyGradientPreset(preset: { primary: string, secondary: string }) {

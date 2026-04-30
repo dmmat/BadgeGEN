@@ -1,38 +1,62 @@
-import { Component, input, ElementRef, viewChild, inject, signal, effect } from '@angular/core';
-import { BadgeDesign, LayoutSettings } from '../services/badge-types';
+import { ChangeDetectionStrategy, Component, ElementRef, HostListener, viewChild, inject, signal, computed, effect } from '@angular/core';
 import { BadgeStore } from '../services/badge.store';
+import { ToastService } from '../services/toast.service';
+import { SHAPE_DEFS, ShapeLayer, LayerStroke } from '../services/shape-defs';
+
+const VIEWBOX = 200;
+const CENTER = 100;
 
 type DraggableType = 'title' | 'subtitle' | 'accent' | 'icon' | 'decoration' | 'extraText';
 
 interface DragState {
   type: DraggableType;
   id?: string; // For decorations/extraText
+  pointerId: number;
   startX: number;
   startY: number;
   elementStartX: number;
   elementStartY: number;
 }
 
+interface RotateState {
+  type: DraggableType;
+  id?: string;
+  pointerId: number;
+  anchorClientX: number;
+  anchorClientY: number;
+  startScreenAngleDeg: number;
+  startRotation: number;
+}
+
+interface Selection {
+  type: DraggableType;
+  id?: string;
+}
+
 @Component({
   selector: 'app-badge-preview',
   template: `
-    <div 
+    <div
       class="relative w-full max-w-[880px] mx-auto flex flex-col items-center p-6 bg-white rounded-xl shadow-sm border border-gray-100"
-      (mousemove)="onMouseMove($event)"
-      (mouseup)="onMouseUp()"
-      (mouseleave)="onMouseUp()"
+      (pointermove)="onPointerMove($event)"
+      (pointerup)="onPointerUp($event)"
+      (pointercancel)="onPointerUp($event)"
     >
       <div class="w-full flex items-center justify-between mb-4 text-xs">
-        <span class="uppercase tracking-wide text-gray-400">Live Preview</span>
+        <span class="uppercase tracking-wide text-gray-400 flex items-center gap-2">
+          Live Preview
+          <span class="text-gray-300" title="Ctrl/Cmd+Z undo · Shift+Z redo · Arrow keys nudge · Shift+Arrow ×10 · Delete removes selection · Esc deselects" aria-label="Keyboard shortcuts">⌨</span>
+        </span>
         <div class="flex gap-2">
-          <button (click)="store.undo()" [disabled]="!store.canUndo()" class="px-3 py-1 rounded-md border border-gray-200 bg-white text-gray-700 font-semibold disabled:opacity-40">↶ Undo</button>
-          <button (click)="store.redo()" [disabled]="!store.canRedo()" class="px-3 py-1 rounded-md border border-gray-200 bg-white text-gray-700 font-semibold disabled:opacity-40">↷ Redo</button>
+          <button (click)="store.undo()" [disabled]="!store.canUndo()" class="px-3 py-1 rounded-md border border-gray-200 bg-white text-gray-700 font-semibold disabled:opacity-40" title="Undo (Ctrl+Z)" aria-label="Undo">↶ Undo</button>
+          <button (click)="store.redo()" [disabled]="!store.canRedo()" class="px-3 py-1 rounded-md border border-gray-200 bg-white text-gray-700 font-semibold disabled:opacity-40" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷ Redo</button>
+          <button (click)="confirmReset()" class="px-3 py-1 rounded-md border border-gray-200 bg-white text-gray-600 font-semibold hover:bg-red-50 hover:text-red-600 hover:border-red-200" title="Reset to default badge" aria-label="Reset design">↺ Reset</button>
         </div>
       </div>
-      <div #captureContainer class="w-full aspect-square max-w-[700px] flex items-center justify-center relative select-none">
+      <div #captureContainer class="w-full aspect-square max-w-[700px] flex items-center justify-center relative select-none" (pointerdown)="clearSelection()">
         
         <!-- SVG Canvas -->
-        <svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-xl cursor-default" xmlns="http://www.w3.org/2000/svg">
+        <svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-xl cursor-default" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
           <defs>
             @if (design().gradientType === 'radial') {
               <radialGradient id="mainGradient" cx="50%" cy="50%" r="70%" fx="50%" fy="50%">
@@ -57,99 +81,135 @@ interface DragState {
             </style>
           </defs>
           
-          <g 
+          <g
             [attr.filter]="design().hasShadow ? 'url(#shadow)' : 'none'"
             [attr.transform]="shapeTransform"
           >
-            <!-- Shapes -->
-            @switch (design().shape) {
-              @case ('circle') {
-                <circle cx="100" cy="100" r="90" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth" />
-                <circle cx="100" cy="100" r="80" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" opacity="0.5" stroke-dasharray="4 2" />
-              }
-              @case ('shield') {
-                <path d="M100 10 L180 50 V110 C180 155 145 185 100 195 C55 185 20 155 20 110 V50 L100 10 Z" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth" />
-                <path d="M100 20 L170 55 V105 C170 145 140 170 100 180 C60 170 30 145 30 105 V55 L100 20 Z" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" opacity="0.3" />
-              }
-              @case ('hexagon') {
-                <polygon points="100,10 190,55 190,145 100,190 10,145 10,55" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth" />
-                <polygon points="100,20 180,60 180,140 100,180 20,140 20,60" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" opacity="0.4" />
-              }
-              @case ('star') {
-                 <polygon points="100,10 123,75 190,78 138,115 155,180 100,145 45,180 62,115 10,78 77,75" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-              }
-              @case ('ribbon') {
-                 <path d="M40 20 H160 V140 L100 110 L40 140 V20 Z" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-                 <rect x="30" y="10" width="140" height="15" rx="5" [attr.fill]="design().secondaryColor" [attr.stroke]="design().borderColor" stroke-width="2"/>
-              }
-              @case ('diamond') {
-                 <polygon points="100,10 190,100 100,190 10,100" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-                 <polygon points="100,25 175,100 100,175 25,100" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" opacity="0.4"/>
-              }
-              @case ('octagon') {
-                 <polygon points="60,10 140,10 190,60 190,140 140,190 60,190 10,140 10,60" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-                 <polygon points="65,20 135,20 180,65 180,135 135,180 65,180 20,135 20,65" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" opacity="0.4"/>
-              }
-              @case ('award') {
-                 <!-- Ribbons behind -->
-                 <path d="M70 150 L50 190 L85 180 L100 195 L115 180 L150 190 L130 150" [attr.fill]="design().secondaryColor" [attr.stroke]="design().borderColor" stroke-width="2"/>
-                 <!-- Main Circle -->
-                 <circle cx="100" cy="90" r="70" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-                 <circle cx="100" cy="90" r="60" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" stroke-dasharray="2 2" opacity="0.6"/>
-              }
-              @case ('plaque') {
-                 <rect x="20" y="30" width="160" height="140" rx="10" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-                 <rect x="30" y="40" width="140" height="120" rx="5" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" opacity="0.4"/>
-              }
-              @case ('gem') {
-                 <path d="M50 30 L150 30 L190 80 L100 180 L10 80 Z" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-                 <path d="M50 30 L100 100 M150 30 L100 100 M190 80 L100 100 M10 80 L100 100 M100 180 L100 100" [attr.stroke]="design().borderColor" stroke-width="1" opacity="0.5"/>
-              }
-              @case ('leaf-1') {
-                 <path d="M 30 90 Q 30 30 90 30 L 170 30 L 170 110 Q 170 170 110 170 L 30 170 Z" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-                 <path d="M 40 95 Q 40 40 95 40 L 160 40 L 160 105 Q 160 160 105 160 L 40 160 Z" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" opacity="0.4"/>
-              }
-              @case ('leaf-2') {
-                 <path d="M 30 30 L 110 30 Q 170 30 170 90 L 170 170 L 90 170 Q 30 170 30 110 Z" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-                 <path d="M 40 40 L 105 40 Q 160 40 160 95 L 160 160 L 95 160 Q 40 160 40 105 Z" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" opacity="0.4"/>
-              }
-              @case ('seal') {
-                 <path d="M100 10 L115 15 L122 25 L135 35 L145 50 L155 65 L165 80 L160 95 L165 110 L155 125 L145 140 L135 155 L122 165 L115 175 L100 180 L85 175 L78 165 L65 155 L55 140 L45 125 L35 110 L40 95 L35 80 L45 65 L55 50 L65 35 L78 25 L85 15 Z" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-                 <circle cx="100" cy="95" r="70" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" stroke-dasharray="3 3" opacity="0.5"/>
-              }
-              @case ('banner') {
-                 <path d="M 30 10 H 170 V 150 L 100 190 L 30 150 Z" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-                 <rect x="40" y="20" width="120" height="120" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" opacity="0.3"/>
-              }
-              @case ('shield-modern') {
-                 <path d="M 30 20 H 170 L 160 120 L 100 190 L 40 120 Z" fill="url(#mainGradient)" [attr.stroke]="design().borderColor" [attr.stroke-width]="design().borderWidth"/>
-                 <path d="M 45 30 H 155 L 148 110 L 100 170 L 52 110 Z" fill="none" [attr.stroke]="design().borderColor" stroke-width="1" opacity="0.4"/>
+            @for (layer of shapeLayers(); track $index) {
+              @switch (layer.kind) {
+                @case ('circle') {
+                  <circle [attr.cx]="layer.cx" [attr.cy]="layer.cy" [attr.r]="layer.r"
+                    [attr.fill]="fillFor(layer.fill)"
+                    [attr.stroke]="design().borderColor"
+                    [attr.stroke-width]="strokeWidthFor(layer.stroke)"
+                    [attr.stroke-opacity]="layer.stroke?.opacity ?? null"
+                    [attr.stroke-dasharray]="layer.stroke?.dasharray ?? null"
+                    [attr.opacity]="layer.stroke?.opacity ?? null"
+                  />
+                }
+                @case ('rect') {
+                  <rect [attr.x]="layer.x" [attr.y]="layer.y"
+                    [attr.width]="layer.width" [attr.height]="layer.height"
+                    [attr.rx]="layer.rx ?? null"
+                    [attr.fill]="fillFor(layer.fill)"
+                    [attr.stroke]="design().borderColor"
+                    [attr.stroke-width]="strokeWidthFor(layer.stroke)"
+                    [attr.stroke-opacity]="layer.stroke?.opacity ?? null"
+                    [attr.stroke-dasharray]="layer.stroke?.dasharray ?? null"
+                    [attr.opacity]="layer.stroke?.opacity ?? null"
+                  />
+                }
+                @case ('polygon') {
+                  <polygon [attr.points]="layer.points"
+                    [attr.fill]="fillFor(layer.fill)"
+                    [attr.stroke]="design().borderColor"
+                    [attr.stroke-width]="strokeWidthFor(layer.stroke)"
+                    [attr.stroke-opacity]="layer.stroke?.opacity ?? null"
+                    [attr.stroke-dasharray]="layer.stroke?.dasharray ?? null"
+                    [attr.opacity]="layer.stroke?.opacity ?? null"
+                  />
+                }
+                @case ('path') {
+                  <path [attr.d]="layer.d"
+                    [attr.fill]="fillFor(layer.fill)"
+                    [attr.stroke]="design().borderColor"
+                    [attr.stroke-width]="strokeWidthFor(layer.stroke)"
+                    [attr.stroke-opacity]="layer.stroke?.opacity ?? null"
+                    [attr.stroke-dasharray]="layer.stroke?.dasharray ?? null"
+                    [attr.opacity]="layer.stroke?.opacity ?? null"
+                  />
+                }
               }
             }
           </g>
 
           <!-- Decorations -->
           @for (deco of design().decorations; track deco.id) {
-            <g 
+            <g
               class="hover:cursor-move hover:opacity-80 decoration-item"
-              (mousedown)="startDrag($event, 'decoration', deco.id)"
+              (pointerdown)="startDrag($event, 'decoration', deco.id)"
               [style.transform]="'translate(' + deco.x + 'px, ' + deco.y + 'px) rotate(' + (deco.rotation || 0) + 'deg) scale(' + (deco.size/20) + ')'"
             >
                @if (deco.type === 'image' && deco.customImage) {
-                  <image 
-                    [attr.href]="deco.customImage" 
+                  <image
+                    [attr.href]="deco.customImage"
+                    [attr.xlink:href]="deco.customImage"
                     x="-10" y="-10" width="20" height="20"
                   />
                } @else {
-                  <!-- Inline paths -->
-                  @if (deco.type === 'star') {
-                    <polygon points="0,-10 2.2,-3.2 9.5,-3.2 3.6,1.1 5.9,7.8 0,3.6 -5.9,7.8 -3.6,1.1 -9.5,-3.2 -2.2,-3.2" [attr.fill]="deco.color || design().textColor"/>
-                  }
-                  @if (deco.type === 'crown') {
-                    <path d="M-10,5 L-10,-5 L-6,-2 L0,-8 L6,-2 L10,-5 L10,5 Z" [attr.fill]="deco.color || design().textColor"/>
-                  }
-                  @if (deco.type === 'check-mark') {
-                     <path d="M-8 0 L-2 6 L8 -6" fill="none" [attr.stroke]="deco.color || design().textColor" stroke-width="3" stroke-linecap="round"/>
+                  @switch (deco.type) {
+                    @case ('star') {
+                      <polygon points="0,-10 2.2,-3.2 9.5,-3.2 3.6,1.1 5.9,7.8 0,3.6 -5.9,7.8 -3.6,1.1 -9.5,-3.2 -2.2,-3.2" [attr.fill]="deco.color || design().textColor"/>
+                    }
+                    @case ('heart') {
+                      <path d="M0,8 C-8,2 -10,-3 -7,-7 C-4,-10 -1,-8 0,-5 C1,-8 4,-10 7,-7 C10,-3 8,2 0,8 Z" [attr.fill]="deco.color || design().textColor"/>
+                    }
+                    @case ('crown') {
+                      <path d="M-10,5 L-10,-5 L-6,-2 L0,-8 L6,-2 L10,-5 L10,5 Z" [attr.fill]="deco.color || design().textColor"/>
+                    }
+                    @case ('check-mark') {
+                      <path d="M-8 0 L-2 6 L8 -6" fill="none" [attr.stroke]="deco.color || design().textColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                    }
+                    @case ('laurel-wreath') {
+                      <g [attr.fill]="deco.color || design().textColor">
+                        <path d="M-9,-2 Q-11,-6 -8,-9 Q-5,-7 -7,-3 Z"/>
+                        <path d="M-9,2 Q-11,6 -8,9 Q-5,7 -7,3 Z"/>
+                        <path d="M-7,-7 Q-9,-10 -5,-11 Q-3,-9 -5,-7 Z"/>
+                        <path d="M-7,7 Q-9,10 -5,11 Q-3,9 -5,7 Z"/>
+                        <path d="M9,-2 Q11,-6 8,-9 Q5,-7 7,-3 Z"/>
+                        <path d="M9,2 Q11,6 8,9 Q5,7 7,3 Z"/>
+                        <path d="M7,-7 Q9,-10 5,-11 Q3,-9 5,-7 Z"/>
+                        <path d="M7,7 Q9,10 5,11 Q3,9 5,7 Z"/>
+                      </g>
+                    }
+                    @case ('ribbon-bow') {
+                      <g [attr.fill]="deco.color || design().textColor">
+                        <path d="M-2,-1 L-9,-6 L-9,6 L-2,1 Z"/>
+                        <path d="M2,-1 L9,-6 L9,6 L2,1 Z"/>
+                        <circle cx="0" cy="0" r="2.5"/>
+                      </g>
+                    }
+                    @case ('wing') {
+                      <g [attr.fill]="deco.color || design().textColor">
+                        <path d="M-2,0 Q-8,-2 -10,2 Q-6,3 -2,2 Z"/>
+                        <path d="M-2,0 Q-7,-4 -9,-1 Q-5,0 -2,-1 Z"/>
+                        <path d="M2,0 Q8,-2 10,2 Q6,3 2,2 Z"/>
+                        <path d="M2,0 Q7,-4 9,-1 Q5,0 2,-1 Z"/>
+                      </g>
+                    }
+                    @case ('sparkles') {
+                      <g [attr.fill]="deco.color || design().textColor">
+                        <path d="M0,-9 L1,-1 L9,0 L1,1 L0,9 L-1,1 L-9,0 L-1,-1 Z"/>
+                        <path d="M-7,-7 L-6,-5 L-4,-4 L-6,-3 L-7,-1 L-8,-3 L-10,-4 L-8,-5 Z" transform="scale(0.4) translate(-12,-12)"/>
+                        <path d="M7,7 L8,9 L10,10 L8,11 L7,13 L6,11 L4,10 L6,9 Z" transform="scale(0.4) translate(12,12)"/>
+                      </g>
+                    }
+                    @case ('trophy') {
+                      <g [attr.fill]="deco.color || design().textColor">
+                        <path d="M-6,-8 L6,-8 L5,2 Q5,5 0,5 Q-5,5 -5,2 Z"/>
+                        <rect x="-2" y="5" width="4" height="3"/>
+                        <rect x="-5" y="8" width="10" height="2" rx="1"/>
+                        <path d="M-6,-6 Q-9,-6 -9,-3 Q-9,-1 -6,-1" fill="none" [attr.stroke]="deco.color || design().textColor" stroke-width="1.5"/>
+                        <path d="M6,-6 Q9,-6 9,-3 Q9,-1 6,-1" fill="none" [attr.stroke]="deco.color || design().textColor" stroke-width="1.5"/>
+                      </g>
+                    }
+                    @case ('medal') {
+                      <g>
+                        <path d="M-5,-9 L-3,-3 L0,-5 L3,-3 L5,-9" fill="none" [attr.stroke]="deco.color || design().textColor" stroke-width="2"/>
+                        <circle cx="0" cy="3" r="6" [attr.fill]="deco.color || design().textColor"/>
+                        <circle cx="0" cy="3" r="3" fill="none" stroke="rgba(0,0,0,0.25)" stroke-width="0.8"/>
+                      </g>
+                    }
                   }
                }
             </g>
@@ -157,26 +217,34 @@ interface DragState {
 
           <!-- Interactive Elements -->
           <!-- Icon / Logo -->
-          <g 
+          <g
             class="hover:cursor-move hover:opacity-80 transition-opacity"
-            (mousedown)="startDrag($event, 'icon')"
+            (pointerdown)="startDrag($event, 'icon')"
             [style.transform]="'translate(' + (design().iconSettings?.x || 100) + 'px, ' + (design().iconSettings?.y || 85) + 'px)'"
           >
+            <!-- Invisible hit area so blank pixels around the emoji are still draggable -->
+            <rect
+              [attr.x]="-(design().iconSettings?.size || 40)/2"
+              [attr.y]="-(design().iconSettings?.size || 40)/2"
+              [attr.width]="design().iconSettings?.size || 40"
+              [attr.height]="design().iconSettings?.size || 40"
+              fill="transparent"
+            />
             @if (design().customLogo) {
-              <image 
-                [attr.href]="design().customLogo" 
-                [attr.width]="design().iconSettings?.size || 40" 
+              <image
+                [attr.href]="design().customLogo"
+                [attr.xlink:href]="design().customLogo"
+                [attr.width]="design().iconSettings?.size || 40"
                 [attr.height]="design().iconSettings?.size || 40"
                 [attr.x]="-(design().iconSettings?.size || 40)/2"
                 [attr.y]="-(design().iconSettings?.size || 40)/2"
               />
             } @else {
-              <text 
-                text-anchor="middle" 
+              <text
+                text-anchor="middle"
                 alignment-baseline="middle"
-                [attr.font-size]="design().iconSettings?.size || 40" 
+                [attr.font-size]="design().iconSettings?.size || 40"
                 filter="url(#shadow)"
-                style="pointer-events: none;"
                 [attr.fill]="design().iconStyle === 'mono' ? design().iconColor : undefined"
               >
                 {{ design().emoji }}
@@ -196,7 +264,7 @@ interface DragState {
             [attr.fill]="design().textColor" 
             [attr.filter]="design().titleSettings?.hasShadow ? 'url(#shadow)' : 'none'"
             class="hover:cursor-move hover:fill-opacity-80 select-none badge-text"
-            (mousedown)="startDrag($event, 'title')"
+            (pointerdown)="startDrag($event, 'title')"
           >
             {{ design().title }}
           </text>
@@ -214,7 +282,7 @@ interface DragState {
             [attr.filter]="design().subtitleSettings?.hasShadow ? 'url(#shadow)' : 'none'"
             opacity="0.9"
             class="hover:cursor-move hover:fill-opacity-80 select-none badge-text"
-            (mousedown)="startDrag($event, 'subtitle')"
+            (pointerdown)="startDrag($event, 'subtitle')"
           >
             {{ design().subtitle }}
           </text>
@@ -232,7 +300,7 @@ interface DragState {
              [attr.fill]="design().textColor"
              [attr.filter]="design().accentSettings?.hasShadow ? 'url(#shadow)' : 'none'"
              class="hover:cursor-move hover:fill-opacity-80 select-none badge-text"
-             (mousedown)="startDrag($event, 'accent')"
+             (pointerdown)="startDrag($event, 'accent')"
           >
              {{ design().accentText }}
           </text>
@@ -251,7 +319,7 @@ interface DragState {
                [attr.fill]="txt.color" 
                [attr.filter]="txt.hasShadow ? 'url(#shadow)' : 'none'"
                class="hover:cursor-move hover:fill-opacity-80 select-none badge-text"
-               (mousedown)="startDrag($event, 'extraText', txt.id)"
+               (pointerdown)="startDrag($event, 'extraText', txt.id)"
              >
                {{ txt.text }}
              </text>
@@ -259,10 +327,37 @@ interface DragState {
           
           <!-- Snapping Guides -->
           @if (isDragging()) {
-             <line x1="100" y1="0" x2="100" y2="200" stroke="#3B82F6" stroke-width="0.5" stroke-dasharray="4 2" 
+             <line data-export-skip="true" x1="100" y1="0" x2="100" y2="200" stroke="#3B82F6" stroke-width="0.5" stroke-dasharray="4 2"
                 [class.opacity-0]="!snappedX()" [class.opacity-100]="snappedX()" />
-             <line x1="0" y1="100" x2="200" y2="100" stroke="#3B82F6" stroke-width="0.5" stroke-dasharray="4 2"
+             <line data-export-skip="true" x1="0" y1="100" x2="200" y2="100" stroke="#3B82F6" stroke-width="0.5" stroke-dasharray="4 2"
                 [class.opacity-0]="!snappedY()" [class.opacity-100]="snappedY()" />
+          }
+
+          <!-- Selection Indicator -->
+          @if (selectionAnchor(); as anchor) {
+             <g data-export-skip="true">
+                <g style="pointer-events: none;">
+                   <circle [attr.cx]="anchor.x" [attr.cy]="anchor.y" r="14" fill="none" stroke="#3B82F6" stroke-width="0.8" stroke-dasharray="3 2" opacity="0.9"/>
+                   <circle [attr.cx]="anchor.x" [attr.cy]="anchor.y" r="1.5" fill="#3B82F6"/>
+                </g>
+                @if (selectionRotation() !== null) {
+                   <g [attr.transform]="'rotate(' + (selectionRotation() ?? 0) + ' ' + anchor.x + ' ' + anchor.y + ')'">
+                      <line style="pointer-events: none;" [attr.x1]="anchor.x" [attr.y1]="anchor.y - 14" [attr.x2]="anchor.x" [attr.y2]="anchor.y - 20" stroke="#3B82F6" stroke-width="0.8" opacity="0.9"/>
+                      <circle
+                        [attr.cx]="anchor.x"
+                        [attr.cy]="anchor.y - 22"
+                        r="2.5"
+                        fill="#3B82F6"
+                        stroke="#FFFFFF"
+                        stroke-width="0.6"
+                        class="cursor-grab"
+                        role="button"
+                        aria-label="Rotate selection"
+                        (pointerdown)="startRotate($event)"
+                      />
+                   </g>
+                }
+             </g>
           }
         </svg>
       </div>
@@ -279,29 +374,53 @@ interface DragState {
           />
           <span class="text-xs text-gray-600">{{store.badge().canvasSize || 1000}}px</span>
 
-          <button (click)="downloadPng()" class="ml-3 bg-gray-900 hover:bg-black text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-lg flex items-center gap-1">
+          <button (click)="downloadPng()" class="ml-3 bg-gray-900 hover:bg-black text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-lg flex items-center gap-1" aria-label="Download PNG">
              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
              PNG
           </button>
+          <button (click)="downloadSvg()" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1" aria-label="Download SVG">
+             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+             SVG
+          </button>
+          <button (click)="downloadJson()" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1" aria-label="Save design as JSON" title="Save design as .badge.json">
+             JSON
+          </button>
+          <label class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer" title="Load design from .badge.json">
+             Load
+             <input type="file" accept="application/json,.json" class="hidden" (change)="loadJson($event)" />
+          </label>
         </div>
       </div>
     </div>
   `,
-  standalone: true
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class BadgePreviewComponent {
-  private static readonly CENTER = 100;
   private static readonly loadedFonts = new Set<string>();
-  readonly CENTER = BadgePreviewComponent.CENTER;
-  
+  readonly CENTER = CENTER;
+
   get shapeTransform() {
     const scale = (this.design().shapeScale || 100) / 100;
-    const c = this.CENTER;
-    return `translate(${c} ${c}) scale(${scale}) translate(-${c} -${c})`;
+    return `translate(${CENTER} ${CENTER}) scale(${scale}) translate(-${CENTER} -${CENTER})`;
   }
   store = inject(BadgeStore);
+  private toast = inject(ToastService);
   design = this.store.badge;
+  readonly shapeLayers = computed<ShapeLayer[]>(() => SHAPE_DEFS[this.design().shape]);
   captureContainer = viewChild<ElementRef>('captureContainer');
+
+  fillFor(fill: ShapeLayer['fill']): string {
+    if (fill === 'gradient') return 'url(#mainGradient)';
+    if (fill === 'secondary') return this.design().secondaryColor;
+    return 'none';
+  }
+
+  strokeWidthFor(stroke?: LayerStroke): number | null {
+    if (!stroke) return null;
+    if (stroke.useBorderWidth) return this.design().borderWidth;
+    return stroke.width ?? 1;
+  }
   private readonly fontLoaderEffect = effect(() => {
     this.ensureFontLoaded(this.design().font);
   });
@@ -312,62 +431,110 @@ export class BadgePreviewComponent {
   snappedX = signal(false);
   snappedY = signal(false);
 
-  startDrag(event: MouseEvent, type: DraggableType, id?: string) {
+  // Selection state for keyboard nudging and visual indicator
+  selection = signal<Selection | null>(null);
+  readonly selectionAnchor = computed(() => this.resolveAnchor(this.selection()));
+  readonly selectionRotation = computed<number | null>(() => {
+    const sel = this.selection();
+    if (!sel) return null;
+    if (sel.type === 'decoration' && sel.id) {
+      return this.design().decorations.find(d => d.id === sel.id)?.rotation ?? 0;
+    }
+    if (sel.type === 'extraText' && sel.id) {
+      return this.design().extraTexts.find(t => t.id === sel.id)?.rotation ?? 0;
+    }
+    return null;
+  });
+
+  private rotateState: RotateState | null = null;
+
+  startDrag(event: PointerEvent, type: DraggableType, id?: string) {
     event.preventDefault();
     event.stopPropagation();
-    
-    // Initial Position Lookup
-    let startX = 0;
-    let startY = 0;
 
-    if (type === 'decoration' && id) {
-      const deco = this.design().decorations.find(d => d.id === id);
-      if (deco) {
-        startX = deco.x;
-        startY = deco.y;
-      }
-    } else if (type === 'extraText' && id) {
-      const txt = this.design().extraTexts.find(t => t.id === id);
-      if (txt) {
-        startX = txt.x;
-        startY = txt.y;
-      }
-    } else if (type !== 'decoration' && type !== 'extraText') {
-      const settings = this.design()[`${type}Settings` as const];
-      if (settings) {
-        startX = settings.x;
-        startY = settings.y;
-      }
-    }
+    const start = this.resolveAnchor({ type, id });
+    if (!start) return;
 
     this.dragState = {
       type,
       id,
+      pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      elementStartX: startX,
-      elementStartY: startY
+      elementStartX: start.x,
+      elementStartY: start.y
     };
     this.isDragging.set(true);
+    this.selection.set({ type, id });
+
+    const target = event.currentTarget as Element | null;
+    target?.setPointerCapture?.(event.pointerId);
   }
 
-  onMouseMove(event: MouseEvent) {
-    if (!this.dragState) return;
-    
+  startRotate(event: PointerEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const sel = this.selection();
+    if (!sel) return;
+    const anchor = this.resolveAnchor(sel);
+    if (!anchor) return;
+    const currentRotation = this.selectionRotation();
+    if (currentRotation === null) return;
+
     const svgRect = this.captureContainer()?.nativeElement.getBoundingClientRect();
     if (!svgRect) return;
-    
-    const scaleFactor = 200 / svgRect.width;
+
+    const scale = svgRect.width / VIEWBOX;
+    const anchorClientX = svgRect.left + anchor.x * scale;
+    const anchorClientY = svgRect.top + anchor.y * scale;
+
+    const dxStart = event.clientX - anchorClientX;
+    const dyStart = event.clientY - anchorClientY;
+    // Handle sits at the top, so '0 deg' = pointer above anchor (-Y direction).
+    // atan2 returns 0 along +X, so add 90° to make 'up' = 0.
+    const startScreenAngleDeg = (Math.atan2(dyStart, dxStart) * 180) / Math.PI + 90;
+
+    this.rotateState = {
+      type: sel.type,
+      id: sel.id,
+      pointerId: event.pointerId,
+      anchorClientX,
+      anchorClientY,
+      startScreenAngleDeg,
+      startRotation: currentRotation
+    };
+
+    const target = event.currentTarget as Element | null;
+    target?.setPointerCapture?.(event.pointerId);
+  }
+
+  onPointerMove(event: PointerEvent) {
+    if (this.rotateState && event.pointerId === this.rotateState.pointerId) {
+      const dx = event.clientX - this.rotateState.anchorClientX;
+      const dy = event.clientY - this.rotateState.anchorClientY;
+      const screenAngleDeg = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
+      let rotation = this.rotateState.startRotation + (screenAngleDeg - this.rotateState.startScreenAngleDeg);
+      if (event.shiftKey) rotation = Math.round(rotation / 15) * 15;
+      rotation = ((rotation % 360) + 360) % 360;
+      this.applyRotation(this.rotateState.type, this.rotateState.id, rotation);
+      return;
+    }
+
+    if (!this.dragState || event.pointerId !== this.dragState.pointerId) return;
+
+    const svgRect = this.captureContainer()?.nativeElement.getBoundingClientRect();
+    if (!svgRect) return;
+
+    const scaleFactor = VIEWBOX / svgRect.width;
     const dx = (event.clientX - this.dragState.startX) * scaleFactor;
     const dy = (event.clientY - this.dragState.startY) * scaleFactor;
-    
+
     let newX = this.dragState.elementStartX + dx;
     let newY = this.dragState.elementStartY + dy;
 
-    // Snapping Logic
     const SNAP_THRESHOLD = 3;
-    const CENTER = 100;
-    
+
     if (Math.abs(newX - CENTER) < SNAP_THRESHOLD) {
       newX = CENTER;
       this.snappedX.set(true);
@@ -382,70 +549,236 @@ export class BadgePreviewComponent {
       this.snappedY.set(false);
     }
 
-    // Update Store
-    if (this.dragState.type === 'decoration' && this.dragState.id) {
-       this.store.updateDecoration(this.dragState.id, { x: newX, y: newY });
-    } else if (this.dragState.type === 'extraText' && this.dragState.id) {
-       this.store.updateExtraText(this.dragState.id, { x: newX, y: newY });
-    } else if (this.dragState.type !== 'decoration' && this.dragState.type !== 'extraText') {
-       this.store.updateElement(this.dragState.type as any, { x: newX, y: newY });
-    }
+    this.applyPosition(this.dragState.type, this.dragState.id, newX, newY);
   }
 
-  onMouseUp() {
+  onPointerUp(event: PointerEvent) {
+    if (this.dragState && event.pointerId === this.dragState.pointerId) {
+      const target = event.currentTarget as Element | null;
+      target?.releasePointerCapture?.(event.pointerId);
+    }
+    if (this.rotateState && event.pointerId === this.rotateState.pointerId) {
+      const target = event.currentTarget as Element | null;
+      target?.releasePointerCapture?.(event.pointerId);
+      this.rotateState = null;
+    }
     this.dragState = null;
     this.isDragging.set(false);
     this.snappedX.set(false);
     this.snappedY.set(false);
   }
 
-  async downloadPng() {
-    const svgElement = this.captureContainer()?.nativeElement.querySelector('svg');
-    if (!svgElement) return;
+  private applyRotation(type: DraggableType, id: string | undefined, rotation: number) {
+    if (type === 'decoration' && id) {
+      this.store.updateDecoration(id, { rotation });
+    } else if (type === 'extraText' && id) {
+      this.store.updateExtraText(id, { rotation });
+    }
+  }
 
-    // Clone to manipulate for export without affecting view
-    const svgClone = svgElement.cloneNode(true) as SVGElement;
-    
-    // Attempt to inline font for better export (Basic Google Fonts support)
-    const fontName = this.design().font;
-    const fontUrl = `https://fonts.googleapis.com/css2?family=${fontName.replace(/ /g, '+')}:wght@400;700&display=swap`;
-    
-    try {
-        const response = await fetch(fontUrl);
-        const css = await response.text();
-        const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
-        style.textContent = `@import url('${fontUrl}');`;
-        svgClone.prepend(style);
-    } catch(e) {
-        console.warn('Font export optimization failed, falling back', e);
+  confirmReset() {
+    if (window.confirm('Reset the badge to defaults? This clears history.')) {
+      this.store.reset();
+      this.selection.set(null);
+    }
+  }
+
+  clearSelection() {
+    this.selection.set(null);
+  }
+
+  @HostListener('window:keydown', ['$event'])
+  onKeyDown(event: KeyboardEvent) {
+    const target = event.target as HTMLElement | null;
+    const tag = target?.tagName;
+    const isEditable = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable;
+
+    const mod = event.metaKey || event.ctrlKey;
+    if (mod && !event.shiftKey && event.key.toLowerCase() === 'z') {
+      event.preventDefault();
+      this.store.undo();
+      return;
+    }
+    if (mod && (event.shiftKey && event.key.toLowerCase() === 'z' || event.key.toLowerCase() === 'y')) {
+      event.preventDefault();
+      this.store.redo();
+      return;
     }
 
-    const svgData = new XMLSerializer().serializeToString(svgClone);
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const img = new Image();
+    if (isEditable) return;
 
+    const sel = this.selection();
+    if (!sel) return;
+
+    if (event.key === 'Escape') {
+      this.selection.set(null);
+      return;
+    }
+
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      if (sel.type === 'decoration' && sel.id) {
+        event.preventDefault();
+        this.store.removeDecoration(sel.id);
+        this.selection.set(null);
+        return;
+      }
+      if (sel.type === 'extraText' && sel.id) {
+        event.preventDefault();
+        this.store.removeExtraText(sel.id);
+        this.selection.set(null);
+        return;
+      }
+    }
+
+    const nudges: Record<string, [number, number]> = {
+      ArrowUp: [0, -1],
+      ArrowDown: [0, 1],
+      ArrowLeft: [-1, 0],
+      ArrowRight: [1, 0]
+    };
+    const delta = nudges[event.key];
+    if (!delta) return;
+    event.preventDefault();
+    const step = event.shiftKey ? 10 : 1;
+    const anchor = this.resolveAnchor(sel);
+    if (!anchor) return;
+    this.applyPosition(sel.type, sel.id, anchor.x + delta[0] * step, anchor.y + delta[1] * step);
+  }
+
+  private resolveAnchor(sel: Selection | null): { x: number; y: number } | null {
+    if (!sel) return null;
+    if (sel.type === 'decoration' && sel.id) {
+      const deco = this.design().decorations.find(d => d.id === sel.id);
+      return deco ? { x: deco.x, y: deco.y } : null;
+    }
+    if (sel.type === 'extraText' && sel.id) {
+      const txt = this.design().extraTexts.find(t => t.id === sel.id);
+      return txt ? { x: txt.x, y: txt.y } : null;
+    }
+    const settings = this.design()[`${sel.type}Settings` as const];
+    return settings ? { x: settings.x, y: settings.y } : null;
+  }
+
+  private applyPosition(type: DraggableType, id: string | undefined, x: number, y: number) {
+    if (type === 'decoration' && id) {
+      this.store.updateDecoration(id, { x, y });
+    } else if (type === 'extraText' && id) {
+      this.store.updateExtraText(id, { x, y });
+    } else if (type !== 'decoration' && type !== 'extraText') {
+      this.store.updateElement(type, { x, y });
+    }
+  }
+
+  async downloadPng() {
+    const svgClone = await this.prepareExportSvg();
+    if (!svgClone) return;
+
+    const svgData = new XMLSerializer().serializeToString(svgClone);
     const size = this.design().canvasSize || 1000;
+    const canvas = document.createElement('canvas');
     canvas.width = size;
     canvas.height = size;
+    const ctx = canvas.getContext('2d');
 
     const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(svgBlob);
+    const img = new Image();
 
     img.onload = () => {
       ctx?.drawImage(img, 0, 0, size, size);
-      const pngUrl = canvas.toDataURL('image/png');
-      
-      const downloadLink = document.createElement('a');
-      downloadLink.href = pngUrl;
-      downloadLink.download = `badge-${Date.now()}.png`;
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
+      try {
+        const pngUrl = canvas.toDataURL('image/png');
+        this.triggerDownload(pngUrl, `badge-${Date.now()}.png`);
+        this.toast.success('PNG downloaded');
+      } catch (err) {
+        console.error('PNG export failed', err);
+        this.toast.error('PNG export failed');
+      }
       URL.revokeObjectURL(url);
     };
-
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      this.toast.error('Could not render badge for export');
+    };
     img.src = url;
+  }
+
+  async downloadSvg() {
+    const svgClone = await this.prepareExportSvg();
+    if (!svgClone) return;
+
+    const svgData = '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(svgClone);
+    const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    this.triggerDownload(url, `badge-${Date.now()}.svg`);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    this.toast.success('SVG downloaded');
+  }
+
+  private async prepareExportSvg(): Promise<SVGElement | null> {
+    const svgElement: SVGElement | null = this.captureContainer()?.nativeElement.querySelector('svg') ?? null;
+    if (!svgElement) return null;
+
+    const svgClone = svgElement.cloneNode(true) as SVGElement;
+
+    // Strip transient editor-only nodes (selection indicator, snap guides)
+    svgClone.querySelectorAll('[data-export-skip]').forEach(node => node.remove());
+
+    // Ensure correct namespace + explicit dimensions for downstream tools
+    const size = this.design().canvasSize || 1000;
+    svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    svgClone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+    svgClone.setAttribute('width', String(size));
+    svgClone.setAttribute('height', String(size));
+
+    const fontName = this.design().font;
+    const fontUrl = `https://fonts.googleapis.com/css2?family=${fontName.replace(/ /g, '+')}:wght@400;700&display=swap`;
+    try {
+      const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+      style.textContent = `@import url('${fontUrl}');`;
+      svgClone.prepend(style);
+    } catch (e) {
+      console.warn('Font import failed', e);
+    }
+
+    return svgClone;
+  }
+
+  private triggerDownload(href: string, filename: string) {
+    const link = document.createElement('a');
+    link.href = href;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  downloadJson() {
+    const blob = new Blob([this.store.exportJson()], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    this.triggerDownload(url, `badge-${Date.now()}.badge.json`);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    this.toast.success('Design saved');
+  }
+
+  loadJson(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result ?? '');
+      const ok = this.store.importJson(text);
+      if (ok) {
+        this.toast.success('Design loaded');
+        this.selection.set(null);
+      } else {
+        this.toast.error('Invalid badge JSON');
+      }
+    };
+    reader.onerror = () => this.toast.error('Could not read file');
+    reader.readAsText(file);
+    input.value = '';
   }
 
   private ensureFontLoaded(font?: string) {

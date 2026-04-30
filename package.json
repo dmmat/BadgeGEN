@@ -6,23 +6,31 @@
   "scripts": {
     "dev": "ng serve",
     "build": "ng build",
-    "preview": "ng serve --configuration=production"
+    "preview": "ng serve --configuration=production",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format": "prettier --write \"src/**/*.{ts,html,css,json}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,html,css,json}\""
   },
   "dependencies": {
-    "rxjs": "^7.8.2",
-    "@angular/core": "^21.0.0",
-    "@angular/forms": "^21.0.6",
-    "@angular/common": "^21.0.0",
-    "@angular/platform-browser": "^21.0.0",
-    "@angular/compiler": "^21.0.0",
     "@angular/build": "^21.0.0",
     "@angular/cli": "^21.0.0",
+    "@angular/common": "^21.0.0",
+    "@angular/compiler": "^21.0.0",
     "@angular/compiler-cli": "^21.0.0",
+    "@angular/core": "^21.0.0",
+    "@angular/forms": "^21.0.6",
+    "@angular/platform-browser": "^21.0.0",
+    "rxjs": "^7.8.2",
     "tailwindcss": "latest"
   },
   "devDependencies": {
+    "@types/jsdom": "^28.0.1",
     "@types/node": "^22.14.0",
+    "jsdom": "^29.1.0",
+    "prettier": "^3.8.3",
     "typescript": "~5.9.0",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "vitest": "^4.1.5"
   }
 }
