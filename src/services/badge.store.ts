@@ -1,5 +1,5 @@
 import { Injectable, signal, computed, effect } from '@angular/core';
-import { BadgeDesign, LayoutSettings, Decoration, ExtraText } from './badge-types';
+import { BadgeDesign, LayoutSettings, Decoration, ExtraText, SealShape, ShapeBorder, Selection } from './badge-types';
 import { layoutFor } from './shape-layouts';
 import { ShapeName } from './shape-defs';
 
@@ -38,7 +38,9 @@ const createDefaultBadge = (): BadgeDesign => ({
   accentSettings: DEFAULT_LAYOUT.accent,
   iconSettings: DEFAULT_LAYOUT.icon,
   decorations: [],
-  extraTexts: []
+  extraTexts: [],
+  sealShapes: [],
+  extraBorders: []
 });
 
 const cloneDesign = (design: BadgeDesign): BadgeDesign => {
@@ -66,6 +68,16 @@ export class BadgeStore {
 
   readonly canUndo = computed(() => this.undoCount() > 0);
   readonly canRedo = computed(() => this.redoCount() > 0);
+
+  /**
+   * Currently selected canvas element. Shared signal so the side panel can
+   * react (scroll the matching settings into view + flash highlight) without
+   * the preview/panel components knowing about each other. Uses deep-equality
+   * so reselecting the same element doesn't re-fire the scroll/flash effect.
+   */
+  readonly selection = signal<Selection | null>(null, {
+    equal: (a, b) => (a === b) || (!!a && !!b && a.type === b.type && a.id === b.id)
+  });
 
   constructor() {
     this.hydrateFromAutosave();
@@ -176,6 +188,70 @@ export class BadgeStore {
     });
   }
 
+  // Seal Shape Actions
+  addSealShape(shape: Omit<SealShape, 'id'>) {
+    const id = crypto.randomUUID();
+    const current = this.state();
+    this.commit({
+      ...current,
+      sealShapes: [...(current.sealShapes ?? []), { ...shape, id }]
+    });
+  }
+
+  updateSealShape(id: string, updates: Partial<SealShape>) {
+    const current = this.state();
+    const merged = {
+      ...current,
+      sealShapes: (current.sealShapes ?? []).map(s => s.id === id ? { ...s, ...updates } : s)
+    } as BadgeDesign;
+
+    const isPositionalChange = 'cx' in updates || 'cy' in updates || 'radius' in updates || 'strokeWidth' in updates;
+    if (isPositionalChange) {
+      this.commitDebounced(`sealShape:${id}`, merged, 200);
+    } else {
+      this.commit(merged);
+    }
+  }
+
+  removeSealShape(id: string) {
+    const current = this.state();
+    this.commit({
+      ...current,
+      sealShapes: (current.sealShapes ?? []).filter(s => s.id !== id)
+    });
+  }
+
+  // Extra Border Actions (concentric outlines following the main shape outline)
+  addExtraBorder(border: Omit<ShapeBorder, 'id'>) {
+    const id = crypto.randomUUID();
+    const current = this.state();
+    this.commit({
+      ...current,
+      extraBorders: [...(current.extraBorders ?? []), { ...border, id }]
+    });
+  }
+
+  updateExtraBorder(id: string, updates: Partial<ShapeBorder>) {
+    const current = this.state();
+    const merged = {
+      ...current,
+      extraBorders: (current.extraBorders ?? []).map(b => b.id === id ? { ...b, ...updates } : b)
+    } as BadgeDesign;
+    if ('width' in updates || 'scale' in updates) {
+      this.commitDebounced(`extraBorder:${id}`, merged, 200);
+    } else {
+      this.commit(merged);
+    }
+  }
+
+  removeExtraBorder(id: string) {
+    const current = this.state();
+    this.commit({
+      ...current,
+      extraBorders: (current.extraBorders ?? []).filter(b => b.id !== id)
+    });
+  }
+
   // Sharing — UTF-safe base64url
   serializeState(): string {
     const json = JSON.stringify(this.state());
@@ -231,7 +307,9 @@ export class BadgeStore {
       ...createDefaultBadge(),
       ...template,
       decorations: template.decorations ?? [],
-      extraTexts: template.extraTexts ?? []
+      extraTexts: template.extraTexts ?? [],
+      sealShapes: template.sealShapes ?? [],
+      extraBorders: template.extraBorders ?? []
     };
     this.commit(merged);
   }
@@ -339,7 +417,9 @@ export class BadgeStore {
         ...createDefaultBadge(),
         ...parsed,
         decorations: parsed.decorations ?? [],
-        extraTexts: parsed.extraTexts ?? []
+        extraTexts: parsed.extraTexts ?? [],
+        sealShapes: parsed.sealShapes ?? [],
+        extraBorders: parsed.extraBorders ?? []
       };
       this.commit(merged);
       return true;

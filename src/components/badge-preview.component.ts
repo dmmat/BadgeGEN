@@ -2,11 +2,17 @@ import { ChangeDetectionStrategy, Component, ElementRef, HostListener, viewChild
 import { BadgeStore } from '../services/badge.store';
 import { ToastService } from '../services/toast.service';
 import { SHAPE_DEFS, ShapeLayer, LayerStroke } from '../services/shape-defs';
+import { CurveSettings, SealShape, Selection, StrokeStyle } from '../services/badge-types';
 
 const VIEWBOX = 200;
 const CENTER = 100;
 
-type DraggableType = 'title' | 'subtitle' | 'accent' | 'icon' | 'decoration' | 'extraText';
+type DraggableType = 'title' | 'subtitle' | 'accent' | 'icon' | 'decoration' | 'extraText' | 'sealShape';
+
+interface CurvePathDef {
+  id: string;
+  d: string;
+}
 
 interface DragState {
   type: DraggableType;
@@ -26,11 +32,6 @@ interface RotateState {
   anchorClientY: number;
   startScreenAngleDeg: number;
   startRotation: number;
-}
-
-interface Selection {
-  type: DraggableType;
-  id?: string;
 }
 
 @Component({
@@ -73,7 +74,24 @@ interface Selection {
             <filter id="shadow">
               <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000000" flood-opacity="0.3"/>
             </filter>
-            
+
+            <!-- Selection highlight: blue halo around the selected element. -->
+            <filter id="selection-glow" x="-30%" y="-30%" width="160%" height="160%">
+              <feMorphology in="SourceAlpha" operator="dilate" radius="1.5" result="thick"/>
+              <feGaussianBlur in="thick" stdDeviation="2" result="blurred"/>
+              <feFlood flood-color="#3B82F6" flood-opacity="0.9" result="color"/>
+              <feComposite in="color" in2="blurred" operator="in" result="glow"/>
+              <feMerge>
+                <feMergeNode in="glow"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+
+            <!-- Curved-text paths -->
+            @for (cp of curvePaths(); track cp.id) {
+              <path [attr.id]="cp.id" [attr.d]="cp.d" fill="none" />
+            }
+
             <!-- Font Style for Export -->
             <style>
                /* Dynamic font class injection */
@@ -92,9 +110,6 @@ interface Selection {
                     [attr.fill]="fillFor(layer.fill)"
                     [attr.stroke]="design().borderColor"
                     [attr.stroke-width]="strokeWidthFor(layer.stroke)"
-                    [attr.stroke-opacity]="layer.stroke?.opacity ?? null"
-                    [attr.stroke-dasharray]="layer.stroke?.dasharray ?? null"
-                    [attr.opacity]="layer.stroke?.opacity ?? null"
                   />
                 }
                 @case ('rect') {
@@ -104,9 +119,6 @@ interface Selection {
                     [attr.fill]="fillFor(layer.fill)"
                     [attr.stroke]="design().borderColor"
                     [attr.stroke-width]="strokeWidthFor(layer.stroke)"
-                    [attr.stroke-opacity]="layer.stroke?.opacity ?? null"
-                    [attr.stroke-dasharray]="layer.stroke?.dasharray ?? null"
-                    [attr.opacity]="layer.stroke?.opacity ?? null"
                   />
                 }
                 @case ('polygon') {
@@ -114,9 +126,6 @@ interface Selection {
                     [attr.fill]="fillFor(layer.fill)"
                     [attr.stroke]="design().borderColor"
                     [attr.stroke-width]="strokeWidthFor(layer.stroke)"
-                    [attr.stroke-opacity]="layer.stroke?.opacity ?? null"
-                    [attr.stroke-dasharray]="layer.stroke?.dasharray ?? null"
-                    [attr.opacity]="layer.stroke?.opacity ?? null"
                   />
                 }
                 @case ('path') {
@@ -124,21 +133,91 @@ interface Selection {
                     [attr.fill]="fillFor(layer.fill)"
                     [attr.stroke]="design().borderColor"
                     [attr.stroke-width]="strokeWidthFor(layer.stroke)"
-                    [attr.stroke-opacity]="layer.stroke?.opacity ?? null"
-                    [attr.stroke-dasharray]="layer.stroke?.dasharray ?? null"
-                    [attr.opacity]="layer.stroke?.opacity ?? null"
                   />
                 }
               }
             }
+
+            <!-- Extra Borders (concentric outlines following the outer geometry) -->
+            @for (border of sortedExtraBorders(); track border.id) {
+              <g [attr.transform]="borderTransform(border)">
+                @switch (outerLayer().kind) {
+                  @case ('circle') {
+                    <circle [attr.cx]="$any(outerLayer()).cx" [attr.cy]="$any(outerLayer()).cy" [attr.r]="$any(outerLayer()).r"
+                      fill="none"
+                      [attr.stroke]="border.color"
+                      [attr.stroke-width]="border.width"
+                      [attr.stroke-opacity]="border.opacity"
+                      [attr.stroke-dasharray]="dashArrayFor(border.style, border.width)"
+                      stroke-linecap="round"
+                      vector-effect="non-scaling-stroke"
+                    />
+                  }
+                  @case ('rect') {
+                    <rect [attr.x]="$any(outerLayer()).x" [attr.y]="$any(outerLayer()).y"
+                      [attr.width]="$any(outerLayer()).width" [attr.height]="$any(outerLayer()).height"
+                      [attr.rx]="$any(outerLayer()).rx ?? null"
+                      fill="none"
+                      [attr.stroke]="border.color"
+                      [attr.stroke-width]="border.width"
+                      [attr.stroke-opacity]="border.opacity"
+                      [attr.stroke-dasharray]="dashArrayFor(border.style, border.width)"
+                      stroke-linecap="round"
+                      vector-effect="non-scaling-stroke"
+                    />
+                  }
+                  @case ('polygon') {
+                    <polygon [attr.points]="$any(outerLayer()).points"
+                      fill="none"
+                      [attr.stroke]="border.color"
+                      [attr.stroke-width]="border.width"
+                      [attr.stroke-opacity]="border.opacity"
+                      [attr.stroke-dasharray]="dashArrayFor(border.style, border.width)"
+                      stroke-linecap="round"
+                      vector-effect="non-scaling-stroke"
+                    />
+                  }
+                  @case ('path') {
+                    <path [attr.d]="$any(outerLayer()).d"
+                      fill="none"
+                      [attr.stroke]="border.color"
+                      [attr.stroke-width]="border.width"
+                      [attr.stroke-opacity]="border.opacity"
+                      [attr.stroke-dasharray]="dashArrayFor(border.style, border.width)"
+                      stroke-linecap="round"
+                      vector-effect="non-scaling-stroke"
+                    />
+                  }
+                }
+              </g>
+            }
           </g>
+
+          <!-- Seal Shapes (decorative rings) -->
+          @for (shape of design().sealShapes; track shape.id) {
+            <circle
+              class="hover:cursor-move hover:opacity-80 transition-opacity"
+              (pointerdown)="startDrag($event, 'sealShape', shape.id)"
+              [attr.filter]="isSelected('sealShape', shape.id) ? 'url(#selection-glow)' : null"
+              [attr.cx]="shape.cx"
+              [attr.cy]="shape.cy"
+              [attr.r]="shape.radius"
+              [attr.fill]="shape.fill || 'none'"
+              [attr.stroke]="shape.stroke"
+              [attr.stroke-width]="shape.strokeWidth"
+              [attr.stroke-dasharray]="dashArrayFor(shape.strokeStyle, shape.strokeWidth)"
+              [attr.stroke-opacity]="shape.strokeOpacity"
+              stroke-linecap="round"
+            />
+          }
 
           <!-- Decorations -->
           @for (deco of design().decorations; track deco.id) {
             <g
               class="hover:cursor-move hover:opacity-80 decoration-item"
               (pointerdown)="startDrag($event, 'decoration', deco.id)"
-              [style.transform]="'translate(' + deco.x + 'px, ' + deco.y + 'px) rotate(' + (deco.rotation || 0) + 'deg) scale(' + (deco.size/20) + ')'"
+              [attr.transform]="'translate(' + deco.x + ' ' + deco.y + ') rotate(' + (deco.rotation || 0) + ') scale(' + (deco.size/20) + ')'"
+              [attr.filter]="isSelected('decoration', deco.id) ? 'url(#selection-glow)' : null"
             >
                @if (deco.type === 'image' && deco.customImage) {
                   <image
@@ -220,7 +299,8 @@ interface Selection {
           <g
             class="hover:cursor-move hover:opacity-80 transition-opacity"
             (pointerdown)="startDrag($event, 'icon')"
-            [style.transform]="'translate(' + (design().iconSettings?.x || 100) + 'px, ' + (design().iconSettings?.y || 85) + 'px)'"
+            [attr.transform]="'translate(' + (design().iconSettings?.x || 100) + ' ' + (design().iconSettings?.y || 85) + ')'"
+            [attr.filter]="isSelected('icon') ? 'url(#selection-glow)' : null"
           >
             <!-- Invisible hit area so blank pixels around the emoji are still draggable -->
             <rect
@@ -253,76 +333,142 @@ interface Selection {
           </g>
 
           <!-- Title -->
-          <text 
-            [attr.x]="design().titleSettings?.x || 100" 
-            [attr.y]="design().titleSettings?.y || 120" 
-            [attr.font-size]="design().titleSettings?.size || 18"
-            text-anchor="middle" 
-            [style.font-family]="design().font"
-            [attr.font-weight]="design().titleSettings?.fontWeight || 'bold'" 
-            [attr.font-style]="design().titleSettings?.fontStyle || 'normal'" 
-            [attr.fill]="design().textColor" 
-            [attr.filter]="design().titleSettings?.hasShadow ? 'url(#shadow)' : 'none'"
-            class="hover:cursor-move hover:fill-opacity-80 select-none badge-text"
-            (pointerdown)="startDrag($event, 'title')"
-          >
-            {{ design().title }}
-          </text>
+          @if (isCurved(design().titleSettings?.curve)) {
+            <text
+              [attr.font-size]="design().titleSettings?.size || 18"
+              text-anchor="middle"
+              [style.font-family]="design().font"
+              [attr.font-weight]="design().titleSettings?.fontWeight || 'bold'"
+              [attr.font-style]="design().titleSettings?.fontStyle || 'normal'"
+              [attr.fill]="design().textColor"
+              [attr.filter]="filterFor('title', undefined, !!design().titleSettings?.hasShadow)"
+              class="hover:cursor-move hover:fill-opacity-80 select-none badge-text"
+              (pointerdown)="startDrag($event, 'title')"
+            >
+              <textPath [attr.href]="'#curve-title'" [attr.xlink:href]="'#curve-title'" startOffset="50%">{{ design().title }}</textPath>
+            </text>
+          } @else {
+            <text
+              [attr.x]="design().titleSettings?.x || 100"
+              [attr.y]="design().titleSettings?.y || 120"
+              [attr.font-size]="design().titleSettings?.size || 18"
+              text-anchor="middle"
+              [style.font-family]="design().font"
+              [attr.font-weight]="design().titleSettings?.fontWeight || 'bold'"
+              [attr.font-style]="design().titleSettings?.fontStyle || 'normal'"
+              [attr.fill]="design().textColor"
+              [attr.filter]="filterFor('title', undefined, !!design().titleSettings?.hasShadow)"
+              class="hover:cursor-move hover:fill-opacity-80 select-none badge-text"
+              (pointerdown)="startDrag($event, 'title')"
+            >
+              {{ design().title }}
+            </text>
+          }
 
           <!-- Subtitle -->
-          <text 
-            [attr.x]="design().subtitleSettings?.x || 100" 
-            [attr.y]="design().subtitleSettings?.y || 140" 
-            [attr.font-size]="design().subtitleSettings?.size || 12"
-            text-anchor="middle" 
-            [style.font-family]="design().font"
-            [attr.font-weight]="design().subtitleSettings?.fontWeight || 'normal'" 
-            [attr.font-style]="design().subtitleSettings?.fontStyle || 'normal'" 
-            [attr.fill]="design().textColor" 
-            [attr.filter]="design().subtitleSettings?.hasShadow ? 'url(#shadow)' : 'none'"
-            opacity="0.9"
-            class="hover:cursor-move hover:fill-opacity-80 select-none badge-text"
-            (pointerdown)="startDrag($event, 'subtitle')"
-          >
-            {{ design().subtitle }}
-          </text>
-          
+          @if (isCurved(design().subtitleSettings?.curve)) {
+            <text
+              [attr.font-size]="design().subtitleSettings?.size || 12"
+              text-anchor="middle"
+              [style.font-family]="design().font"
+              [attr.font-weight]="design().subtitleSettings?.fontWeight || 'normal'"
+              [attr.font-style]="design().subtitleSettings?.fontStyle || 'normal'"
+              [attr.fill]="design().textColor"
+              [attr.filter]="filterFor('subtitle', undefined, !!design().subtitleSettings?.hasShadow)"
+              opacity="0.9"
+              class="hover:cursor-move hover:fill-opacity-80 select-none badge-text"
+              (pointerdown)="startDrag($event, 'subtitle')"
+            >
+              <textPath [attr.href]="'#curve-subtitle'" [attr.xlink:href]="'#curve-subtitle'" startOffset="50%">{{ design().subtitle }}</textPath>
+            </text>
+          } @else {
+            <text
+              [attr.x]="design().subtitleSettings?.x || 100"
+              [attr.y]="design().subtitleSettings?.y || 140"
+              [attr.font-size]="design().subtitleSettings?.size || 12"
+              text-anchor="middle"
+              [style.font-family]="design().font"
+              [attr.font-weight]="design().subtitleSettings?.fontWeight || 'normal'"
+              [attr.font-style]="design().subtitleSettings?.fontStyle || 'normal'"
+              [attr.fill]="design().textColor"
+              [attr.filter]="filterFor('subtitle', undefined, !!design().subtitleSettings?.hasShadow)"
+              opacity="0.9"
+              class="hover:cursor-move hover:fill-opacity-80 select-none badge-text"
+              (pointerdown)="startDrag($event, 'subtitle')"
+            >
+              {{ design().subtitle }}
+            </text>
+          }
+
           <!-- Accent Text -->
-          <text 
-             [attr.x]="design().accentSettings?.x || 100"
-             [attr.y]="design().accentSettings?.y || 165"
-             [attr.font-size]="design().accentSettings?.size || 10"
-             text-anchor="middle" 
-             letter-spacing="2" 
-             [style.font-family]="design().font"
-             [attr.font-weight]="design().accentSettings?.fontWeight || 'bold'" 
-             [attr.font-style]="design().accentSettings?.fontStyle || 'normal'"
-             [attr.fill]="design().textColor"
-             [attr.filter]="design().accentSettings?.hasShadow ? 'url(#shadow)' : 'none'"
-             class="hover:cursor-move hover:fill-opacity-80 select-none badge-text"
-             (pointerdown)="startDrag($event, 'accent')"
-          >
-             {{ design().accentText }}
-          </text>
+          @if (isCurved(design().accentSettings?.curve)) {
+            <text
+              [attr.font-size]="design().accentSettings?.size || 10"
+              text-anchor="middle"
+              letter-spacing="2"
+              [style.font-family]="design().font"
+              [attr.font-weight]="design().accentSettings?.fontWeight || 'bold'"
+              [attr.font-style]="design().accentSettings?.fontStyle || 'normal'"
+              [attr.fill]="design().textColor"
+              [attr.filter]="filterFor('accent', undefined, !!design().accentSettings?.hasShadow)"
+              class="hover:cursor-move hover:fill-opacity-80 select-none badge-text"
+              (pointerdown)="startDrag($event, 'accent')"
+            >
+              <textPath [attr.href]="'#curve-accent'" [attr.xlink:href]="'#curve-accent'" startOffset="50%">{{ design().accentText }}</textPath>
+            </text>
+          } @else {
+            <text
+              [attr.x]="design().accentSettings?.x || 100"
+              [attr.y]="design().accentSettings?.y || 165"
+              [attr.font-size]="design().accentSettings?.size || 10"
+              text-anchor="middle"
+              letter-spacing="2"
+              [style.font-family]="design().font"
+              [attr.font-weight]="design().accentSettings?.fontWeight || 'bold'"
+              [attr.font-style]="design().accentSettings?.fontStyle || 'normal'"
+              [attr.fill]="design().textColor"
+              [attr.filter]="filterFor('accent', undefined, !!design().accentSettings?.hasShadow)"
+              class="hover:cursor-move hover:fill-opacity-80 select-none badge-text"
+              (pointerdown)="startDrag($event, 'accent')"
+            >
+              {{ design().accentText }}
+            </text>
+          }
 
           <!-- Extra Texts -->
           @for (txt of design().extraTexts; track txt.id) {
-             <text 
-               [attr.x]="txt.x" 
-               [attr.y]="txt.y" 
-               [attr.font-size]="txt.size"
-               [attr.transform]="'rotate(' + txt.rotation + ', ' + txt.x + ', ' + txt.y + ')'"
-               text-anchor="middle" 
-               [style.font-family]="design().font"
-               [attr.font-weight]="txt.fontWeight"
-               [attr.font-style]="txt.fontStyle"
-               [attr.fill]="txt.color" 
-               [attr.filter]="txt.hasShadow ? 'url(#shadow)' : 'none'"
-               class="hover:cursor-move hover:fill-opacity-80 select-none badge-text"
-               (pointerdown)="startDrag($event, 'extraText', txt.id)"
-             >
-               {{ txt.text }}
-             </text>
+            @if (isCurved(txt.curve)) {
+              <text
+                [attr.font-size]="txt.size"
+                text-anchor="middle"
+                [style.font-family]="design().font"
+                [attr.font-weight]="txt.fontWeight"
+                [attr.font-style]="txt.fontStyle"
+                [attr.fill]="txt.color"
+                [attr.filter]="filterFor('extraText', txt.id, txt.hasShadow)"
+                class="hover:cursor-move hover:fill-opacity-80 select-none badge-text"
+                (pointerdown)="startDrag($event, 'extraText', txt.id)"
+              >
+                <textPath [attr.href]="'#curve-extra-' + txt.id" [attr.xlink:href]="'#curve-extra-' + txt.id" startOffset="50%">{{ txt.text }}</textPath>
+              </text>
+            } @else {
+              <text
+                [attr.x]="txt.x"
+                [attr.y]="txt.y"
+                [attr.font-size]="txt.size"
+                [attr.transform]="'rotate(' + txt.rotation + ', ' + txt.x + ', ' + txt.y + ')'"
+                text-anchor="middle"
+                [style.font-family]="design().font"
+                [attr.font-weight]="txt.fontWeight"
+                [attr.font-style]="txt.fontStyle"
+                [attr.fill]="txt.color"
+                [attr.filter]="filterFor('extraText', txt.id, txt.hasShadow)"
+                class="hover:cursor-move hover:fill-opacity-80 select-none badge-text"
+                (pointerdown)="startDrag($event, 'extraText', txt.id)"
+              >
+                {{ txt.text }}
+              </text>
+            }
           }
           
           <!-- Snapping Guides -->
@@ -333,31 +479,27 @@ interface Selection {
                 [class.opacity-0]="!snappedY()" [class.opacity-100]="snappedY()" />
           }
 
-          <!-- Selection Indicator -->
+          <!-- Selection: visual highlight is the selection-glow SVG filter
+               applied to the element itself (see filterFor). Here we only
+               render the rotation handle, floating above the anchor. -->
           @if (selectionAnchor(); as anchor) {
-             <g data-export-skip="true">
-                <g style="pointer-events: none;">
-                   <circle [attr.cx]="anchor.x" [attr.cy]="anchor.y" r="14" fill="none" stroke="#3B82F6" stroke-width="0.8" stroke-dasharray="3 2" opacity="0.9"/>
-                   <circle [attr.cx]="anchor.x" [attr.cy]="anchor.y" r="1.5" fill="#3B82F6"/>
+             @if (selectionRotation() !== null) {
+                <g data-export-skip="true" [attr.transform]="'rotate(' + (selectionRotation() ?? 0) + ' ' + anchor.x + ' ' + anchor.y + ')'">
+                   <line style="pointer-events: none;" [attr.x1]="anchor.x" [attr.y1]="anchor.y - 14" [attr.x2]="anchor.x" [attr.y2]="anchor.y - 20" stroke="#3B82F6" stroke-width="0.8" opacity="0.9"/>
+                   <circle
+                     [attr.cx]="anchor.x"
+                     [attr.cy]="anchor.y - 22"
+                     r="2.5"
+                     fill="#3B82F6"
+                     stroke="#FFFFFF"
+                     stroke-width="0.6"
+                     class="cursor-grab"
+                     role="button"
+                     aria-label="Rotate selection"
+                     (pointerdown)="startRotate($event)"
+                   />
                 </g>
-                @if (selectionRotation() !== null) {
-                   <g [attr.transform]="'rotate(' + (selectionRotation() ?? 0) + ' ' + anchor.x + ' ' + anchor.y + ')'">
-                      <line style="pointer-events: none;" [attr.x1]="anchor.x" [attr.y1]="anchor.y - 14" [attr.x2]="anchor.x" [attr.y2]="anchor.y - 20" stroke="#3B82F6" stroke-width="0.8" opacity="0.9"/>
-                      <circle
-                        [attr.cx]="anchor.x"
-                        [attr.cy]="anchor.y - 22"
-                        r="2.5"
-                        fill="#3B82F6"
-                        stroke="#FFFFFF"
-                        stroke-width="0.6"
-                        class="cursor-grab"
-                        role="button"
-                        aria-label="Rotate selection"
-                        (pointerdown)="startRotate($event)"
-                      />
-                   </g>
-                }
-             </g>
+             }
           }
         </svg>
       </div>
@@ -398,6 +540,7 @@ interface Selection {
 })
 export class BadgePreviewComponent {
   private static readonly loadedFonts = new Set<string>();
+  private static readonly inlinedFontCss = new Map<string, string>();
   readonly CENTER = CENTER;
 
   get shapeTransform() {
@@ -408,7 +551,99 @@ export class BadgePreviewComponent {
   private toast = inject(ToastService);
   design = this.store.badge;
   readonly shapeLayers = computed<ShapeLayer[]>(() => SHAPE_DEFS[this.design().shape]);
+  /** The outermost geometry layer of the active shape — reused for extra borders. */
+  readonly outerLayer = computed<ShapeLayer>(() => SHAPE_DEFS[this.design().shape][0]);
+  /**
+   * Extra borders sorted by visible outer extent (outermost first), so inner
+   * rings paint last and stay on top. Extent = scale + halfWidth/viewBox.
+   */
+  readonly sortedExtraBorders = computed(() =>
+    [...(this.design().extraBorders ?? [])].sort((a, b) => {
+      const ea = (a.scale ?? 1) + a.width / (2 * VIEWBOX);
+      const eb = (b.scale ?? 1) + b.width / (2 * VIEWBOX);
+      return eb - ea;
+    })
+  );
   captureContainer = viewChild<ElementRef>('captureContainer');
+
+  readonly curvePaths = computed<CurvePathDef[]>(() => {
+    const d = this.design();
+    const out: CurvePathDef[] = [];
+    const push = (id: string, curve: CurveSettings | undefined, anchorX: number | undefined, anchorY: number | undefined) => {
+      if (!curve || curve.radius <= 0) return;
+      // Position the arc so that its midpoint (where the text sits) lands at the
+      // element's (x, y) — keeps curved text anchored to where the user dragged
+      // it instead of jumping up by `radius`.
+      const ax = anchorX ?? CENTER;
+      const ay = anchorY ?? CENTER;
+      const angleRad = (curve.centerAngle * Math.PI) / 180;
+      const cx = ax - curve.radius * Math.sin(angleRad);
+      const cy = ay + curve.radius * Math.cos(angleRad);
+      out.push({ id, d: this.curvePathD(cx, cy, curve.radius, curve.centerAngle, curve.flip) });
+    };
+    push('curve-title', d.titleSettings?.curve, d.titleSettings?.x, d.titleSettings?.y);
+    push('curve-subtitle', d.subtitleSettings?.curve, d.subtitleSettings?.x, d.subtitleSettings?.y);
+    push('curve-accent', d.accentSettings?.curve, d.accentSettings?.x, d.accentSettings?.y);
+    for (const t of d.extraTexts) {
+      push(`curve-extra-${t.id}`, t.curve, t.x, t.y);
+    }
+    return out;
+  });
+
+  isCurved(curve: CurveSettings | undefined): boolean {
+    return !!curve && curve.radius > 0;
+  }
+
+  /**
+   * Build an arc path whose midpoint (at startOffset=50%) sits on the circle of
+   * `r` centered at (cx,cy), at `centerAngleDeg` (0 = top, +clockwise from viewer).
+   * `flip=false` lays the glyphs on the OUTSIDE of the arc (good for top text);
+   * `flip=true`  lays them on the INSIDE (good for bottom text that should still
+   * read upright).
+   */
+  curvePathD(cx: number, cy: number, r: number, centerAngleDeg: number, flip: boolean): string {
+    const mathCenter = (centerAngleDeg - 90) * Math.PI / 180;
+    const startA = flip ? mathCenter + Math.PI / 2 : mathCenter - Math.PI / 2;
+    const endA   = flip ? mathCenter - Math.PI / 2 : mathCenter + Math.PI / 2;
+    const sweep  = flip ? 0 : 1;
+    const sx = cx + r * Math.cos(startA);
+    const sy = cy + r * Math.sin(startA);
+    const ex = cx + r * Math.cos(endA);
+    const ey = cy + r * Math.sin(endA);
+    return `M ${sx.toFixed(2)} ${sy.toFixed(2)} A ${r} ${r} 0 0 ${sweep} ${ex.toFixed(2)} ${ey.toFixed(2)}`;
+  }
+
+  /** True when the given selectable element is the current canvas selection. */
+  isSelected(type: 'title' | 'subtitle' | 'accent' | 'icon' | 'decoration' | 'extraText' | 'sealShape', id?: string): boolean {
+    const sel = this.selection();
+    if (!sel || sel.type !== type) return false;
+    if (id !== undefined) return sel.id === id;
+    return !sel.id;
+  }
+
+  /**
+   * Combine `shadow` (user-controlled drop shadow) and `selection-glow` (blue
+   * halo) into one chained `filter=` attribute. Returns null when neither
+   * applies so the attribute isn't rendered as 'none url(...)'.
+   */
+  filterFor(type: 'title' | 'subtitle' | 'accent' | 'icon' | 'decoration' | 'extraText' | 'sealShape', id: string | undefined, hasShadow: boolean): string | null {
+    const filters: string[] = [];
+    if (hasShadow) filters.push('url(#shadow)');
+    if (this.isSelected(type, id)) filters.push('url(#selection-glow)');
+    return filters.length ? filters.join(' ') : null;
+  }
+
+  /** Scale a border's geometry around the badge centre. */
+  borderTransform(border: { scale?: number }): string {
+    const s = border.scale ?? 1;
+    return `translate(${CENTER} ${CENTER}) scale(${s}) translate(-${CENTER} -${CENTER})`;
+  }
+
+  dashArrayFor(style: StrokeStyle, width: number): string | null {
+    if (style === 'dashed') return `${Math.max(width * 2, 2)} ${Math.max(width * 1.5, 2)}`;
+    if (style === 'dotted') return `0 ${Math.max(width * 1.8, 1)}`;
+    return null;
+  }
 
   fillFor(fill: ShapeLayer['fill']): string {
     if (fill === 'gradient') return 'url(#mainGradient)';
@@ -431,8 +666,9 @@ export class BadgePreviewComponent {
   snappedX = signal(false);
   snappedY = signal(false);
 
-  // Selection state for keyboard nudging and visual indicator
-  selection = signal<Selection | null>(null);
+  // Selection state for keyboard nudging and visual indicator (lives on the
+  // store so the side panel can also react and highlight the matching block).
+  selection = this.store.selection;
   readonly selectionAnchor = computed(() => this.resolveAnchor(this.selection()));
   readonly selectionRotation = computed<number | null>(() => {
     const sel = this.selection();
@@ -628,6 +864,12 @@ export class BadgePreviewComponent {
         this.selection.set(null);
         return;
       }
+      if (sel.type === 'sealShape' && sel.id) {
+        event.preventDefault();
+        this.store.removeSealShape(sel.id);
+        this.selection.set(null);
+        return;
+      }
     }
 
     const nudges: Record<string, [number, number]> = {
@@ -655,6 +897,10 @@ export class BadgePreviewComponent {
       const txt = this.design().extraTexts.find(t => t.id === sel.id);
       return txt ? { x: txt.x, y: txt.y } : null;
     }
+    if (sel.type === 'sealShape' && sel.id) {
+      const shape = this.design().sealShapes.find(s => s.id === sel.id);
+      return shape ? { x: shape.cx, y: shape.cy } : null;
+    }
     const settings = this.design()[`${sel.type}Settings` as const];
     return settings ? { x: settings.x, y: settings.y } : null;
   }
@@ -664,7 +910,9 @@ export class BadgePreviewComponent {
       this.store.updateDecoration(id, { x, y });
     } else if (type === 'extraText' && id) {
       this.store.updateExtraText(id, { x, y });
-    } else if (type !== 'decoration' && type !== 'extraText') {
+    } else if (type === 'sealShape' && id) {
+      this.store.updateSealShape(id, { cx: x, cy: y });
+    } else if (type !== 'decoration' && type !== 'extraText' && type !== 'sealShape') {
       this.store.updateElement(type, { x, y });
     }
   }
@@ -724,6 +972,18 @@ export class BadgePreviewComponent {
     // Strip transient editor-only nodes (selection indicator, snap guides)
     svgClone.querySelectorAll('[data-export-skip]').forEach(node => node.remove());
 
+    // Strip selection-glow filter from any selected element so the export
+    // doesn't carry the editor's blue halo. Remove the filter definition too.
+    svgClone.querySelectorAll('[filter*="selection-glow"]').forEach(node => {
+      const value = (node.getAttribute('filter') ?? '')
+        .replace(/url\(#selection-glow\)/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (value) node.setAttribute('filter', value);
+      else node.removeAttribute('filter');
+    });
+    svgClone.querySelector('#selection-glow')?.remove();
+
     // Ensure correct namespace + explicit dimensions for downstream tools
     const size = this.design().canvasSize || 1000;
     svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
@@ -732,16 +992,60 @@ export class BadgePreviewComponent {
     svgClone.setAttribute('height', String(size));
 
     const fontName = this.design().font;
-    const fontUrl = `https://fonts.googleapis.com/css2?family=${fontName.replace(/ /g, '+')}:wght@400;700&display=swap`;
-    try {
+    const css = await this.inlineFontFaces(fontName);
+    if (css) {
       const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-      style.textContent = `@import url('${fontUrl}');`;
+      style.textContent = css;
       svgClone.prepend(style);
-    } catch (e) {
-      console.warn('Font import failed', e);
     }
 
     return svgClone;
+  }
+
+  /**
+   * Fetch a Google Fonts CSS bundle and replace every external `url(...)` with a
+   * base64 data URI. Browsers render `<img src="blob:...">` of an SVG in a
+   * sandboxed context that won't honour `@import` or remote `url(...)`, so we
+   * must inline the actual woff2 bytes for the PNG export to use the right
+   * font. Result is cached per-family for the session.
+   */
+  private async inlineFontFaces(fontName: string): Promise<string> {
+    if (!fontName) return '';
+    const cached = BadgePreviewComponent.inlinedFontCss.get(fontName);
+    if (cached) return cached;
+
+    const fontUrl = `https://fonts.googleapis.com/css2?family=${fontName.replace(/ /g, '+')}:ital,wght@0,400;0,700;1,400;1,700&display=swap`;
+    try {
+      const cssRes = await fetch(fontUrl);
+      if (!cssRes.ok) return '';
+      let css = await cssRes.text();
+
+      const urls = Array.from(new Set([...css.matchAll(/url\((https?:\/\/[^)]+)\)/g)].map(m => m[1])));
+      const pairs = await Promise.all(urls.map(async (url): Promise<[string, string]> => {
+        try {
+          const r = await fetch(url);
+          if (!r.ok) return [url, ''];
+          const blob = await r.blob();
+          const dataUri = await new Promise<string>((resolve, reject) => {
+            const fr = new FileReader();
+            fr.onload = () => resolve(String(fr.result));
+            fr.onerror = () => reject(new Error('font read failed'));
+            fr.readAsDataURL(blob);
+          });
+          return [url, dataUri];
+        } catch {
+          return [url, ''];
+        }
+      }));
+      for (const [url, dataUri] of pairs) {
+        if (dataUri) css = css.split(url).join(dataUri);
+      }
+      BadgePreviewComponent.inlinedFontCss.set(fontName, css);
+      return css;
+    } catch (e) {
+      console.warn('Font inline failed', e);
+      return '';
+    }
   }
 
   private triggerDownload(href: string, filename: string) {

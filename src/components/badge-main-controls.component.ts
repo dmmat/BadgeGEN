@@ -129,6 +129,46 @@ import { BadgeDesign } from '../services/badge-types';
           <input type="checkbox" id="shadowToggle" class="h-8 w-8 rounded border-gray-300 text-blue-600 focus:ring-blue-500" [ngModel]="store.badge().hasShadow" (ngModelChange)="store.update({hasShadow: $event})">
           <label for="shadowToggle" class="text-xs font-medium text-gray-700">Enable Badge Shadow</label>
         </div>
+
+        <!-- Extra Borders -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-gray-500">Extra borders</span>
+            <button (click)="addExtraBorder()" class="text-xs text-blue-600 font-bold hover:text-blue-700" aria-label="Add extra border">+ Border</button>
+          </div>
+          @for (b of store.badge().extraBorders; track b.id) {
+            <div class="bg-gray-50 p-2 rounded border border-gray-200 space-y-2 text-xs">
+              <div class="flex items-center gap-2">
+                <span class="w-12 text-gray-500">Width</span>
+                <input type="range" min="0.5" max="50" step="0.5" [value]="b.width" (input)="store.updateExtraBorder(b.id, {width: +$any($event.target).value})" class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" aria-label="Border width">
+                <span class="w-10 text-right text-gray-500">{{ b.width }}</span>
+                <button (click)="store.removeExtraBorder(b.id)" class="text-red-500 hover:text-red-700 ml-1" aria-label="Remove border">×</button>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="w-12 text-gray-500">Size</span>
+                <input type="range" min="0.1" max="1.1" step="0.01" [value]="b.scale ?? 1" (input)="store.updateExtraBorder(b.id, {scale: +$any($event.target).value})" class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" aria-label="Border size">
+                <span class="w-10 text-right text-gray-500">{{ ((b.scale ?? 1) * 100).toFixed(0) }}%</span>
+              </div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="w-12 text-gray-500">Color</span>
+                <input type="color" [ngModel]="b.color" (ngModelChange)="store.updateExtraBorder(b.id, {color: $event})" class="w-5 h-5 p-0 border border-gray-200 rounded bg-white cursor-pointer" aria-label="Border color">
+                <select [ngModel]="b.style" (ngModelChange)="store.updateExtraBorder(b.id, {style: $event})" class="text-xs rounded border-gray-300 bg-white text-gray-900 px-1 py-0.5">
+                  <option value="solid">Solid</option>
+                  <option value="dashed">Dashed</option>
+                  <option value="dotted">Dotted</option>
+                </select>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="w-12 text-gray-500">Opacity</span>
+                <input type="range" min="0" max="1" step="0.05" [value]="b.opacity" (input)="store.updateExtraBorder(b.id, {opacity: +$any($event.target).value})" class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" aria-label="Border opacity">
+                <span class="w-10 text-right text-gray-500">{{ (b.opacity * 100).toFixed(0) }}%</span>
+              </div>
+            </div>
+          }
+          @if (store.badge().extraBorders.length === 0) {
+            <p class="text-[11px] text-gray-400">Stacked outlines around the main shape. Widest paints first.</p>
+          }
+        </div>
       </div>
 
     </div>
@@ -164,6 +204,16 @@ export class BadgeMainControlsComponent {
     this.store.update({
       primaryColor: preset.primary,
       secondaryColor: preset.secondary
+    });
+  }
+
+  addExtraBorder() {
+    this.store.addExtraBorder({
+      color: '#FFFFFF',
+      width: 2,
+      style: 'solid',
+      opacity: 0.9,
+      scale: 1
     });
   }
 }
